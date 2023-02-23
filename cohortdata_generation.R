@@ -1,0 +1,1 @@
+# generate data following the data structure of the cohort data
