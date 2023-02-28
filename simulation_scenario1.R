@@ -1,3 +1,9 @@
+rm(list=ls())
+
+# install packages
+library(tidyr)
+library(ggplot2)
+
 # Scenario I
 # Aim:
 # 1) What is the performance of stoEM when U~Ber(0.5)
@@ -49,8 +55,8 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,-1),
   return(sim.data)
 }
 
-alpha <- 0
-beta <- 0
+alpha <- -1
+beta <- 1
 ret <- data.frame()
 for (n in 2500) {
   for (j in 1:500) {
@@ -91,3 +97,23 @@ for (n in 2500) {
     
   }
 }
+
+# save data format
+# sim.{scenario}.{alpha}.{beta}.{Udist}.{n}.{project}
+# sim.1.0.0.1.2500
+# Udist: 1-Ber(0.5)
+sim.1.0.0.1.2500.pa <- ret
+save(sim.1.0.0.1.2500.pa, file="../sim.data/sim.1.0.0.1.2500.pa.RData")
+
+
+# plot
+ret %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", 0, ", ", beta, "=", 0)))
+
+
+
