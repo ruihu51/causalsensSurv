@@ -29,7 +29,9 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,-1),
   X3 <- factor(sample(0:5, size = n, replace = TRUE, 
                       prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
   # U: unmeasured confounder
-  U <- rbinom(n, 1, p=0.5)
+  # U <- rbinom(n, 1, p=0.5) # dist-1
+  # U <- rnorm(n, 0, 1) # dist-2
+  U <- runif(n, 0, 1) # dist-3
   sim.data <- data.frame(X1=X1, X2=X2, X3=X3, U=U)
   
   # treatment 
@@ -104,7 +106,14 @@ for (n in 2500) {
 # Udist: 1-Ber(0.5)
 sim.1.0.0.1.2500.pa <- ret
 save(sim.1.0.0.1.2500.pa, file="../sim.data/sim.1.0.0.1.2500.pa.RData")
-
+sim.1.n1.1.1.2500.pa <- ret
+save(sim.1.n1.1.1.2500.pa, file="../sim.data/sim.1.n1.1.1.2500.pa.RData")
+sim.1.n2.2.1.2500.pa <- ret
+save(sim.1.n2.2.1.2500.pa, file="../sim.data/sim.1.n2.2.1.2500.pa.RData")
+sim.1.n1.1.2.2500.pa <- ret
+save(sim.1.n1.1.2.2500.pa, file="../sim.data/sim.1.n1.1.2.2500.pa.RData")
+sim.1.n1.1.3.2500.pa <- ret
+save(sim.1.n1.1.3.2500.pa, file="../sim.data/sim.1.n1.1.3.2500.pa.RData")
 
 # plot
 ret %>%
@@ -115,5 +124,34 @@ ret %>%
   geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
   ggtitle(expression(paste(alpha, "=", 0, ", ", beta, "=", 0)))
 
+ret %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1)))
 
+ret %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", -2, ", ", beta, "=", 2)))
 
+ret %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~N(0,1)")))
+
+ret %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~unif(0,1)")))
