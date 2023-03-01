@@ -155,3 +155,13 @@ ret %>%
   geom_density() +
   geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
   ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~unif(0,1)")))
+
+# TODO: check the bias distribution
+sim.1.n1.1.2.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(-1)) %>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") +
+  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~N(0,1)")))
