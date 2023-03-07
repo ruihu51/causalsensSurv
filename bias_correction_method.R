@@ -65,7 +65,7 @@ p_ij <- matrix(c(0.8, 0.1, 0, 0, 0, 0,
                  0, 0, 0, 0.1, 0.8, 0.2,
                  0, 0, 0, 0, 0.1, 0.8), nrow = 6, byrow = TRUE)
 
-generate.data <- function(n, theta = c(0,-1), 
+generate.data <- function(n, theta = c(0,-1), p_ij=p_ij,
                           eta_a = list(eta_a1=c(0,0.1),
                                        eta_a2=c(0,0.01,0.02,0.03,0.04),
                                        eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -127,14 +127,14 @@ fit.mcsimex$coefficients[1]
 
 ret <- data.frame()
 for (n in 2500) {
-  for (j in 1:500) {
+  for (j in 11:500) {
     
     seed <- sample(1e3:1e8, 1)
     set.seed(seed)
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data(n=n, theta = c(0,-1), 
+    sim.data <- generate.data(n=n, theta = c(0,-1), p_ij = p_ij.star,
                               eta_a = list(eta_a1=c(0,0.1),
                                            eta_a2=c(0,0.01,0.02,0.03,0.04),
                                            eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -176,6 +176,32 @@ for (n in 2500) {
     
   }
 }
+
+ret %>%
+  gather(key='type', value='est', c("observed", "crude", "observed.se", "crude.se", "simex")) %>%
+  filter(type %in% c("observed","crude", "simex")) %>%
+  mutate(bias=est-(-1)) %>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
+
+save(ret, file = "../sim.data/tmp.ret.RData")
+
+# save data format
+# sim.{scenario}.{eta}.{mis_prob}.{n}.{project}
+# eta-1: eta_a3=c(0,-0.02,-0.04,-0.06,-0.08,-0.1)
+# eta-2: eta_t3=c(0,0.2,0.4,0.6,0.8,1)
+# TODO: add a dictionary to save the parameters settings
+sim.2.1.1.2500.pa <- ret
+save(sim.2.1.1.2500.pa, file="../sim.data/sim.2.1.1.2500.pa.RData")
+sim.2.2.1.2500.pa <- ret
+save(sim.2.2.1.2500.pa, file="../sim.data/sim.2.2.1.2500.pa.RData")
+sim.2.2.2.2500.pa <- ret
+save(sim.2.2.2.2500.pa, file="../sim.data/sim.2.2.2.2500.pa.RData")
+
+# TODO:
+# 1) mis_prob-3
+# 2)
 # TODO:
 # What if the misclassification model is misspecified?
 
