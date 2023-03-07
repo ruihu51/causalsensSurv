@@ -7,6 +7,7 @@ library(ggplot2)
 # Scenario II
 # Aim:
 # 1) validate whether the observed adjusted effect lie between the true and crude effect
+# 2) the effect of C.check: C.star -> C.check
 
 
 # 1)
@@ -148,6 +149,108 @@ ret %>%
 
 
 
+# 2)
+# K=2
+p_ij <- matrix(c(0.8,0.1,0.2,0.9), nrow = 2, byrow = TRUE)
+
+generate.data <- function(n, theta = c(0,-1), 
+                          eta_a = list(eta_a1=c(0,0.1),
+                                       eta_a2=c(0,0.01,0.02,0.03,0.04),
+                                       eta_a3=c(0,-0.02,-0.04,-0.06,-0.08,-0.1)), 
+                          eta_t = list(eta_t1=c(0,-0.1),
+                                       eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                       eta_t3=c(0,0.02,0.04,0.06,0.08,0.1))){
+  
+  # covariates
+  X1 <- factor(sample(0:1, size = n, replace = TRUE, prob = c(0.3, 0.7)))
+  X2 <- factor(sample(0:1, size = n, replace = TRUE, 
+                     prob = c(0.4, 0.6)))
+  X2.star <- numeric(n)
+  for (i in 1:n){
+    if(X2[i]=="1"){
+      u <- runif(1,0,1)
+      X2.star[i] <- ifelse(u<p_ij[2,2],"1","0")
+    } else {
+      u <- runif(1,0,1)
+      X2.star[i] <- ifelse(u<p_ij[1,1],"0","1")
+    }
+  }
+  X2.star <- factor(X2.star)
+  # X2.star <- factor(unlist(lapply(X2, gen_chd_given_parents, category=levels(X2), prob_matrix=p_ij)))
+  sim.data <- data.frame(X1=X1, X2=X2, X2.star=X2.star)
+  
+  # treatment 
+  glm_a <- with(sim.data, eta_a$eta_a1[X1] + eta_a$eta_a2[X2])
+  prob_a <- pnorm(glm_a)
+  A <- rbinom(n, 1, prob_a)
+  sim.data$A <- factor(A)
+  
+  # sample T conditional on A and X
+  rate <- exp(with(sim.data, theta[A] + eta_t$eta_t1[X1] + eta_t$eta_t2[X2]))
+  # outcome
+  T <- rexp(n, rate)
+  C <- runif(n, 0.5, 1)
+  
+  # observed outcome
+  Y <- pmin(T, C)
+  D <- (T<=C)
+  sim.data$Y <- Y
+  sim.data$D <- D
+  
+  return(sim.data)
+}
 
 
 
+ret <- data.frame()
+for (n in 2500) {
+  for (j in 1:500) {
+    
+    seed <- sample(1e3:1e8, 1)
+    set.seed(seed)
+    cat(n, j, seed, '\n')
+    
+    # generate data
+    sim.data <- generate.data(n=n, theta = c(0,-1), 
+                              eta_a = list(eta_a1=c(0,0.1),
+                                           eta_a2=c(0,0.8)), 
+                              eta_t = list(eta_t1=c(0,-0.1),
+                                           eta_t2=c(0,-1.2)))
+    
+    try({
+      # fit.true <- coxph(Surv(Y, D) ~ A + X1 + X2, data=sim.data)
+      
+      # observed adjusted causal hazard ratio
+      fit.obs <- coxph(Surv(Y, D) ~ A + X1 + X2.star, data=sim.data)
+      theta.hat.obs <- fit.obs$coefficients[1]
+      theta.hat.obs.se <- sqrt(fit.obs$var[1,1])
+      
+      # crude effect
+      sim.data$X2.check <- gen_unobs(N = n, C.star = sim.data$X2.star, p_11 = p_ij[1,1], p_22=p_ij[2,2])
+      fit.adj <- coxph(Surv(Y, D) ~ A + X1 + X2.check, data=sim.data)
+      theta.hat.adj <- fit.adj$coefficients[1]
+      theta.hat.adj.se <- sqrt(fit.adj$var[1,1])
+      
+      if (length(ret)>0){
+        ret.tmp <- data.frame(observed = theta.hat.obs, observed.se = theta.hat.obs.se, 
+                              adj = theta.hat.adj, adj.se = theta.hat.adj.se, 
+                              n=n, j=j, seed=seed)
+        
+        ret <- rbind(ret, ret.tmp)
+      } else {
+        ret <- data.frame(observed = theta.hat.obs, observed.se = theta.hat.obs.se, 
+                          adj = theta.hat.adj, adj.se = theta.hat.adj.se, 
+                          n=n, j=j, seed=seed)
+      }
+    })
+    
+  }
+}
+
+ret %>%
+  gather(key='type', value='est', c("observed", "adj", "observed.se", "adj.se")) %>%
+  filter(type %in% c("observed","adj")) %>%
+  mutate(bias=est-(-1)) %>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
