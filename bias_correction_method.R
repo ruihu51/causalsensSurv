@@ -127,20 +127,20 @@ fit.mcsimex$coefficients[1]
 
 ret <- data.frame()
 for (n in 2500) {
-  for (j in 11:500) {
+  for (j in 1:500) {
     
     seed <- sample(1e3:1e8, 1)
     set.seed(seed)
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data(n=n, theta = c(0,-1), p_ij = p_ij.star,
+    sim.data <- generate.data(n=n, theta = c(0,-1), p_ij = p_ij,
                               eta_a = list(eta_a1=c(0,0.1),
                                            eta_a2=c(0,0.01,0.02,0.03,0.04),
-                                           eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
+                                           eta_a3=c(0,-1.2,-1.4,-1.6,-1.8,-2)), 
                               eta_t = list(eta_t1=c(0,-0.1),
                                            eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
-                                           eta_t3=c(0,0.2,0.4,0.6,0.8,1)))
+                                           eta_t3=c(0,1.2,1.4,1.6,1.8,2)))
     
     try({
       # observed adjusted causal hazard ratio
@@ -198,10 +198,9 @@ sim.2.2.1.2500.pa <- ret
 save(sim.2.2.1.2500.pa, file="../sim.data/sim.2.2.1.2500.pa.RData")
 sim.2.2.2.2500.pa <- ret
 save(sim.2.2.2.2500.pa, file="../sim.data/sim.2.2.2.2500.pa.RData")
+sim.2.2.3.2500.pa <- ret
+save(sim.2.2.3.2500.pa, file="../sim.data/sim.2.2.3.2500.pa.RData")
 
-# TODO:
-# 1) mis_prob-3
-# 2)
 # TODO:
 # What if the misclassification model is misspecified?
 
