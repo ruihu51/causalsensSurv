@@ -59,6 +59,7 @@ naive.model <- coxph(Surv(Y, D) ~ A + X1 + X2.star, data=sim.data, model = TRUE)
 dimnames(p_ij) <- list(levels(sim.data$X2.star), levels(sim.data$X2.star))
 fit.mcsimex <- mcsimex(naive.model, mc.matrix = list(X2.star=p_ij), 
                        SIMEXvariable = c("X2.star"), asymptotic = FALSE)
+summary(fit.mcsimex)
 
 # K>2
 p_ij <- matrix(c(0.8, 0.1, 0, 0, 0, 0,
@@ -196,12 +197,24 @@ ret %>%
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
 
+ret %>%
+  gather(key='type', value='est', c("observed", "simex", "simex.1", "mecor")) %>%
+  # filter(type %in% c("observed","crude", "simex")) %>%
+  mutate(bias=est-(-1)) %>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
+
 save(ret, file = "../sim.data/tmp.ret.RData")
 
 # save data format
 # sim.{scenario}.{eta}.{mis_prob}.{n}.{project}
 # eta-1: eta_a3=c(0,-0.02,-0.04,-0.06,-0.08,-0.1)
 # eta-2: eta_t3=c(0,0.2,0.4,0.6,0.8,1)
+# update
+# sim.{scenario}.{gen}.{eta}.{mis_prob}.{n}.{project}
+# gen-null: generate.data (survival outcome)
+# gen-gaussian: 
 
 sim.2.1.1.2500.pa <- ret
 save(sim.2.1.1.2500.pa, file="../sim.data/sim.2.1.1.2500.pa.RData")
@@ -213,7 +226,8 @@ sim.2.2.3.2500.pa <- ret
 save(sim.2.2.3.2500.pa, file="../sim.data/sim.2.2.3.2500.pa.RData")
 sim.2.3.2.2500.pa <- ret
 save(sim.2.3.2.2500.pa, file="../sim.data/sim.2.3.2.2500.pa.RData")
-
+sim.2.gaussian.2.3.2500.pa.1 <- ret
+save(sim.2.gaussian.2.3.2500.pa.1, file="../sim.data/sim.2.gaussian.2.3.2500.pa.1.RData")
 
 # 2) continuous outcome Y, binary A, binary X1 and X2, misclassified X2*
 generate.data.gaussian <- function(n, theta = c(0,-1), 
@@ -376,11 +390,21 @@ fit.mcsimex <- mcsimex(naive.model, mc.matrix = list(X3.star=p_ij.star),
 # 4) mecor not available for survival outcome but
 # TODO: maybe can extend mecor to survival outcome
 # but for now it is good to compare SIMEX and mecor in continuous Y and discrete X
+# TODO: it is actually also interesting to see what if SIMEX misclassified
+
+p_ij.star1 <- matrix(c(0.76, 0.1, 0.02, 0.02, 0.02, 0.02,
+                      0.16, 0.75, 0.1, 0.02, 0.02, 0.02,
+                      0.02, 0.08, 0.75, 0.1, 0.02, 0.02,
+                      0.02, 0.02, 0.08, 0.75, 0.08, 0.02,
+                      0.02, 0.02, 0.02, 0.08, 0.75, 0.16,
+                      0.02, 0.02, 0.02, 0.02, 0.1, 0.76), nrow = 6, byrow = TRUE)
+
 ret <- data.frame()
 for (n in 2500) {
-  for (j in 12:500) {
+  for (j in 317:500) {
     
     seed <- sample(1e3:1e8, 1)
+    # seed <- sim.2.gaussian.2.3.2500.pa[(sim.2.gaussian.2.3.2500.pa$n==n) & (sim.2.gaussian.2.3.2500.pa$j==j), "seed"][1]
     set.seed(seed)
     cat(n, j, seed, '\n')
     
@@ -402,9 +426,13 @@ for (n in 2500) {
       # mcsimex
       naive.model <- glm(Y ~ A + X1 + X2 + X3.star, family = "gaussian", data=sim.data, x=T, y=T)
       dimnames(p_ij.star) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
+      dimnames(p_ij.star1) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
       fit.mcsimex <- mcsimex(naive.model, mc.matrix = list(X3.star=p_ij.star), 
                              SIMEXvariable = c("X3.star"))
       theta.hat.simex <- fit.mcsimex$coefficients[2]
+      fit.mcsimex.mis <- mcsimex(naive.model, mc.matrix = list(X3.star=p_ij.star1), 
+                             SIMEXvariable = c("X3.star"))
+      theta.hat.simex.mis <- fit.mcsimex.mis$coefficients[2]
       
       # mecor
       var.true <- round(var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star)),2)
@@ -412,13 +440,13 @@ for (n in 2500) {
       theta.hat.mecor <- fit.mecor$corfit$coef[3]
       
       if (length(ret)>0){
-        ret.tmp <- data.frame(observed = theta.hat.obs, 
+        ret.tmp <- data.frame(observed = theta.hat.obs, simex = theta.hat.simex.mis,
                               simex = theta.hat.simex, mecor = theta.hat.mecor,
                               n=n, j=j, seed=seed)
         
         ret <- rbind(ret, ret.tmp)
       } else {
-        ret <- data.frame(observed = theta.hat.obs, 
+        ret <- data.frame(observed = theta.hat.obs, simex = theta.hat.simex.mis,
                           simex = theta.hat.simex, mecor = theta.hat.mecor,
                           n=n, j=j, seed=seed)
       }
