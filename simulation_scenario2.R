@@ -5,6 +5,7 @@ library(survival)
 library(simex)
 library(mecor)
 library(tidyr)
+library(dplyr)
 library(ggplot2)
 
 # Scenario II
@@ -314,6 +315,10 @@ save(sim.2.surv.4.4.2.2500.pa, file="../sim.data/sim.2.surv.4.4.2.2500.pa.RData"
 
 sim.2.surv.4.4.3.2500.pa %>%
   head()
+load(file = "../sim.data/sim.2.surv.4.4.1.2500.pa.RData")
+load(file = "../sim.data/sim.2.surv.4.4.2.2500.pa.RData")
+load(file = "../sim.data/sim.2.surv.4.4.3.2500.pa.RData")
+load(file = "../sim.data/sim.2.surv.4.4.4.2500.pa.RData")
 colnames <- colnames(sim.2.surv.4.4.3.2500.pa)
 ret.3.est <- sim.2.surv.4.4.3.2500.pa %>%
               gather(key='type', value='est', colnames[1:22]) %>%
@@ -353,6 +358,66 @@ ret.2.est <- sim.2.surv.4.4.2.2500.pa %>%
 ret.2.est %>% group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)))
+sim.2.surv.1 <- ret.1.est %>%
+  filter(type %in% c("observed","simex.1", "mcsimex.1")) %>%
+  mutate(setting="No treatment effect null")
+sim.2.surv.2 <- ret.2.est %>%
+  filter(type %in% c("observed","simex.1", "mcsimex.1")) %>%
+  mutate(setting="Weak alternative")
+sim.2.surv.3 <- ret.3.est %>%
+  filter(type %in% c("observed","simex.1", "mcsimex.1")) %>%
+  mutate(setting="Moderate alternative")
+sim.2.surv.4 <- ret.4.est %>%
+  filter(type %in% c("observed","simex.1", "mcsimex.1")) %>%
+  mutate(setting="Strong alternative")
+   
+
+
+
+fig.sim.2.surv.bias.1 <- bind_rows(
+          sim.2.surv.1,
+          sim.2.surv.2,
+          sim.2.surv.3,
+          sim.2.surv.4)
+
+fig.sim.2.surv.bias.1$setting <- factor(fig.sim.2.surv.bias.1$setting,
+                        levels = c("No treatment effect null",
+                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
+fig.sim.2.surv.bias.1.plot <- fig.sim.2.surv.bias.1%>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_me_surv_bias.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.surv.bias.1.plot) #saves g
+
+fig2a.plot <- fig2a %>%
+  filter(!setting %in% c("Treatment effect homogeneity null")) %>%
+  mutate(ci.type = factor(ci.type, levels=c("Wald", "Bootstrap"))) %>%
+  rename(CI.type = ci.type) %>%
+  ggplot() +
+  geom_line(aes(log(n), coverage.c, colour=CI.type, linetype=CI.type)) +
+  scale_linetype_manual(values=c("dotdash", "solid")) +
+  scale_color_manual(values=c('#009900','#FF0000')) +
+  scale_size_manual(values=c(2, 1)) +
+  geom_hline(yintercept=.95, colour="#A0A0A0", linetype="longdash") +
+  ylim(0.4, 1) +
+  facet_grid(~ setting) +
+  labs(y = expression(Empirical~coverage~of~confidence~intervals~"for"~psi[0])) +
+  scale_x_continuous(
+    name="Log sample size",
+    limits = c(log(200), log(5500)),
+    breaks=c(log(250), log(500), log(1000), log(2500), log(5000)),
+    labels=c("log(250)", "log(500)", "log(1K)", "log(2.5K)", "log(5K)")) +
+  theme_bw() +
+    theme(legend.position="bottom")
+
+ggsave(file="Figures/Fig20_coverage_Sim1.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig2a.plot) #saves g
+
 
 ret.3.se <- sim.2.surv.4.4.3.2500.pa %>%
   gather(key='se.type', value='se', colnames[1:22]) %>%
@@ -484,7 +549,7 @@ for (n in 2500) {
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data.gaussian(n=n, theta = c(0,0.1), p_ij = p_ij,
+    sim.data <- generate.data.gaussian(n=n, theta = c(0,0.5), p_ij = p_ij,
                                        eta_a = list(eta_a1=c(0,-0.1),
                                                     eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
                                                     eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -508,23 +573,23 @@ for (n in 2500) {
       var.true <- var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star))
       fit.simex.1 <- simex(naive.model.continuous, measurement.error = var.true, 
                            SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
-      theta.hat.simex.1 <- fit.simex.1$coefficients[1]
-      theta.hat.simex.se.1 <- sqrt(fit.simex.1$variance.jackknife[1,1])
+      theta.hat.simex.1 <- fit.simex.1$coefficients[2]
+      theta.hat.simex.se.1 <- sqrt(fit.simex.1$variance.jackknife[2,2])
       
       fit.simex.2 <- simex(naive.model.continuous, measurement.error = var.true*1.1, 
                            SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
-      theta.hat.simex.2 <- fit.simex.2$coefficients[1]
-      theta.hat.simex.se.2 <- sqrt(fit.simex.2$variance.jackknife[1,1])
+      theta.hat.simex.2 <- fit.simex.2$coefficients[2]
+      theta.hat.simex.se.2 <- sqrt(fit.simex.2$variance.jackknife[2,2])
       
       fit.simex.3 <- simex(naive.model.continuous, measurement.error = var.true*1.6, 
                            SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
-      theta.hat.simex.3 <- fit.simex.3$coefficients[1]
-      theta.hat.simex.se.3 <- sqrt(fit.simex.3$variance.jackknife[1,1])
+      theta.hat.simex.3 <- fit.simex.3$coefficients[2]
+      theta.hat.simex.se.3 <- sqrt(fit.simex.3$variance.jackknife[2,2])
       
       fit.simex.4 <- simex(naive.model.continuous, measurement.error = var.true*0.6, 
                            SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
-      theta.hat.simex.4 <- fit.simex.4$coefficients[1]
-      theta.hat.simex.se.4 <- sqrt(fit.simex.4$variance.jackknife[1,1])
+      theta.hat.simex.4 <- fit.simex.4$coefficients[2]
+      theta.hat.simex.se.4 <- sqrt(fit.simex.4$variance.jackknife[2,2])
       
       # mecor
       fit.mecor.1 <- mecor(Y~MeasErrorRandom(as.numeric(X3.star), variance = var.true)+A+X1+X2, data=sim.data)
@@ -587,11 +652,114 @@ save(sim.2.gaussian.4.4.2.2500.pa, file="../sim.data/sim.2.gaussian.4.4.2.2500.p
 
 # plot
 # check the bias distribution
-ret %>%
+sim.2.gaussian.4.4.1.2500.pa %>%
   gather(key='type', value='est', colnames(ret)[1:20]) %>%
   filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
                      "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5)) %>%
+  mutate(bias=est-(0)) %>%
   ggplot(aes(x=bias, colour = type)) +
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
+
+colnames.2 <- colnames(ret)[1:20]
+ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.5))
+ret.1.3.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.5))
+ret.1.3.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.5))
+ret.1.3.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+load(file = "../sim.data/sim.2.gaussian.4.4.1.2500.pa.RData")
+ret.1.1.est <- sim.2.gaussian.4.4.1.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0))
+ret.1.1.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+ret.1.1.se <- sim.2.gaussian.4.4.1.2500.pa %>%
+  gather(key='se.type', value='se', colnames.2[1:20]) %>%
+  filter(se.type %in% c("observed.se", "observed.cont.se","simex.se.1", "simex.se.2", "simex.se.3", "simex.se.4",
+                        "mecor.se.1", "mecor.se.2", "mecor.se.3", "mecor.se.4"))
+
+ret.1.1 <- cbind(ret.1.1.est, ret.1.1.se)[c(1,2,3,4,5,6,10,11)]
+ret.1.1 %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= 0 & 0 <= ul)) %>%
+  group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)),
+            coverage = mean(coverage))
+ret.1.2.est <- sim.2.gaussian.4.4.2.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.1))
+ret.1.2.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.5))
+ret.1.3.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+ret.1.4.est <- sim.2.gaussian.4.4.4.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(1))
+ret.1.4.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+fig2a.plot <- fig2a %>%
+  filter(!setting %in% c("Treatment effect homogeneity null")) %>%
+  mutate(ci.type = factor(ci.type, levels=c("Wald", "Bootstrap"))) %>%
+  rename(CI.type = ci.type) %>%
+  ggplot() +
+  geom_line(aes(log(n), coverage.c, colour=CI.type, linetype=CI.type)) +
+  scale_linetype_manual(values=c("dotdash", "solid")) +
+  scale_color_manual(values=c('#009900','#FF0000')) +
+  scale_size_manual(values=c(2, 1)) +
+  geom_hline(yintercept=.95, colour="#A0A0A0", linetype="longdash") +
+  ylim(0.4, 1) +
+  facet_grid(~ setting) +
+  labs(y = expression(Empirical~coverage~of~confidence~intervals~"for"~psi[0])) +
+  scale_x_continuous(
+    name="Log sample size",
+    limits = c(log(200), log(5500)),
+    breaks=c(log(250), log(500), log(1000), log(2500), log(5000)),
+    labels=c("log(250)", "log(500)", "log(1K)", "log(2.5K)", "log(5K)")) +
+  theme_bw() +
+  theme(legend.position="none",
+        text = element_text(size = 12))
+
+ggsave(file="Figures/Fig20_coverage_Sim1.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig2a.plot) #saves g

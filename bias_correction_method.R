@@ -205,7 +205,7 @@ ret %>%
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
 
-save(ret, file = "../sim.data/tmp.ret.8.RData")
+save(ret, file = "../sim.data/tmp.ret.9.RData")
 
 # save data format
 # sim.{scenario}.{eta}.{mis_prob}.{n}.{project}
