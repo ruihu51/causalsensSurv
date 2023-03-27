@@ -14,13 +14,13 @@ library(ggplot2)
 # alpha=beta=0, theta=-1, n=2500, lambda0=1
 # est: naive, stoEM
 
-generate.data <- function(n, alpha=0, beta=0, theta = c(0,-1), 
-                          eta_a = list(eta_a1=c(0,0.1),
-                            eta_a2=c(0,0.01,0.02,0.03,0.04),
-                            eta_a3=c(0,-0.02,-0.04,-0.06,-0.08,-0.1)), 
+generate.data <- function(n, alpha=0, beta=0, theta = c(0,1), 
+                          eta_a = list(eta_a1=c(0,-0.1),
+                                       eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                       eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
                           eta_t = list(eta_t1=c(0,-0.1),
-                            eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
-                            eta_t3=c(0,0.02,0.04,0.06,0.08,0.1))){
+                                       eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                       eta_t3=c(0,-0.2,-0.4,-0.6,-0.8,-1))){
   
   # covariates
   X1 <- factor(sample(0:1, size = n, replace = TRUE, prob = c(0.3, 0.7)))
@@ -30,8 +30,8 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,-1),
                       prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
   # U: unmeasured confounder
   # U <- rbinom(n, 1, p=0.5) # dist-1
-  # U <- rnorm(n, 0, 1) # dist-2
-  U <- runif(n, 0, 1) # dist-3
+  U <- rnorm(n, 0, 1) # dist-2
+  # U <- runif(n, 0, 1) # dist-3
   sim.data <- data.frame(X1=X1, X2=X2, X3=X3, U=U)
   
   # treatment 
@@ -57,7 +57,7 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,-1),
   return(sim.data)
 }
 
-alpha <- -1
+alpha <- 1
 beta <- 1
 ret <- data.frame()
 for (n in 2500) {
@@ -115,6 +115,19 @@ save(sim.1.n1.1.2.2500.pa, file="../sim.data/sim.1.n1.1.2.2500.pa.RData")
 sim.1.n1.1.3.2500.pa <- ret
 save(sim.1.n1.1.3.2500.pa, file="../sim.data/sim.1.n1.1.3.2500.pa.RData")
 
+sim.1.1.1.1.2500.pa <- ret
+save(sim.1.1.1.1.2500.pa, file="../sim.data/sim.1.1.1.1.2500.pa.RData")
+sim.1.2.2.1.2500.pa <- ret
+save(sim.1.2.2.1.2500.pa, file="../sim.data/sim.1.2.2.1.2500.pa.RData")
+sim.1.2.2.1.2500.pa <- ret
+save(sim.1.2.2.1.2500.pa, file="../sim.data/sim.1.2.2.1.2500.pa.RData")
+sim.1.0.0.1.2500.pa <- ret
+save(sim.1.0.0.1.2500.pa, file="../sim.data/sim.1.0.0.1.2500.pa.RData")
+sim.1.1.1.2.2500.pa <- ret
+save(sim.1.1.1.2.2500.pa, file="../sim.data/sim.1.1.1.2.2500.pa.RData")
+sim.1.1.1.3.2500.pa <- sim.1.1.1.1.2500.pa
+save(sim.1.1.1.3.2500.pa, file="../sim.data/sim.1.1.1.3.2500.pa.RData")
+
 # plot
 ret %>%
   gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
@@ -165,3 +178,83 @@ sim.1.n1.1.2.2500.pa %>%
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash") +
   ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~N(0,1)")))
+
+# Fig 1a
+sim.1.0 <- sim.1.0.0.1.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="No unmeasured confounding")
+
+sim.1.1 <- sim.1.1.1.1.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Moderate unmeasured confounder")
+
+sim.1.2 <- sim.1.2.2.1.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Strong unmeasured confounder")
+
+fig.sim.1.ber.bias <- bind_rows(
+  sim.1.0,
+  sim.1.1,
+  sim.1.2)
+
+fig.sim.1.ber.bias$setting <- factor(fig.sim.1.ber.bias$setting,
+                                        levels = c("No unmeasured confounding",
+                                                   "Moderate unmeasured confounder", 
+                                                   "Strong unmeasured confounder"))
+fig.sim.1.ber.bias.plot <- fig.sim.1.ber.bias%>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() + 
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_um_ber_bias.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.1.ber.bias.plot) #saves g
+
+# Fig 1b
+sim.1.ber <- sim.1.1.1.1.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Bernoulli distribution")
+
+sim.1.normal <- sim.1.1.1.2.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Normal distribution")
+
+sim.1.uniform <- sim.1.1.1.3.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Uniform distribution")
+
+fig.sim.1.dist <- bind_rows(
+  sim.1.ber,
+  sim.1.normal,
+  sim.1.uniform)
+
+fig.sim.1.dist$setting <- factor(fig.sim.1.dist$setting,
+                                     levels = c("Bernoulli distribution",
+                                                "Normal distribution", 
+                                                "Uniform distribution"))
+fig.sim.1.dist.plot <- fig.sim.1.dist%>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() + 
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_um_dist_bias.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.1.dist.plot) #saves g

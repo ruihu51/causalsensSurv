@@ -394,6 +394,83 @@ fig.sim.2.surv.bias.1.plot <- fig.sim.2.surv.bias.1%>%
 ggsave(file="../figures/Fig_me_surv_bias.eps", width = 290,
        height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.surv.bias.1.plot) #saves g
 
+##################
+sim.2.surv.1 <- ret.1.est %>%
+  filter(type %in% c("observed", "mcsimex.1", "mcsimex.2", "mcsimex.3")) %>%
+  mutate(setting="No treatment effect null")
+sim.2.surv.2 <- ret.2.est %>%
+  filter(type %in% c("observed", "mcsimex.1", "mcsimex.2", "mcsimex.3")) %>%
+  mutate(setting="Weak alternative")
+sim.2.surv.3 <- ret.3.est %>%
+  filter(type %in% c("observed", "mcsimex.1", "mcsimex.2", "mcsimex.3")) %>%
+  mutate(setting="Moderate alternative")
+sim.2.surv.4 <- ret.4.est %>%
+  filter(type %in% c("observed", "mcsimex.1", "mcsimex.2", "mcsimex.3")) %>%
+  mutate(setting="Strong alternative")
+
+
+sim.2.surv.1 <- ret.1.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="No treatment effect null")
+sim.2.surv.2 <- ret.2.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Weak alternative")
+sim.2.surv.3 <- ret.3.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Moderate alternative")
+sim.2.surv.4 <- ret.4.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Strong alternative")
+
+fig.sim.2.surv.bias.2 <- bind_rows(
+  sim.2.surv.1,
+  sim.2.surv.2,
+  sim.2.surv.3,
+  sim.2.surv.4)
+
+fig.sim.2.surv.bias.2 <- fig.sim.2.surv.bias.2 %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+    (type == "simex.1") ~ "simex (correct)", 
+                         (type == "simex.2") ~ "simex (mild)",
+                         (type == "simex.3") ~ "simex (severe)"
+  ))
+
+fig.sim.2.surv.bias.2 <- fig.sim.2.surv.bias.2 %>%
+  mutate(model=case_when((type == "observed") ~ "observed", 
+                         (type == "mcsimex.1") ~ "mcsimex (correct)", 
+                         (type == "mcsimex.2") ~ "mcsimex (mild)",
+                         (type == "mcsimex.3") ~ "mcsimex (severe)"
+  ))
+
+fig.sim.2.surv.bias.2$setting <- factor(fig.sim.2.surv.bias.2$setting,
+                                        levels = c("No treatment effect null",
+                                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
+fig.sim.2.surv.bias.2.plot.simex <- fig.sim.2.surv.bias.2%>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() + 
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_me_surv_bias_simex.eps", width = 240,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.surv.bias.2.plot.simex) #saves g
+
+
+fig.sim.2.surv.bias.2.plot.mcsimex <- fig.sim.2.surv.bias.2%>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() + 
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_me_surv_bias_mcsimex.eps", width = 240,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.surv.bias.2.plot.mcsimex) #saves g
+
+
 fig2a.plot <- fig2a %>%
   filter(!setting %in% c("Treatment effect homogeneity null")) %>%
   mutate(ci.type = factor(ci.type, levels=c("Wald", "Bootstrap"))) %>%
@@ -739,27 +816,83 @@ ret.1.4.est %>% group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)))
 
-fig2a.plot <- fig2a %>%
-  filter(!setting %in% c("Treatment effect homogeneity null")) %>%
-  mutate(ci.type = factor(ci.type, levels=c("Wald", "Bootstrap"))) %>%
-  rename(CI.type = ci.type) %>%
-  ggplot() +
-  geom_line(aes(log(n), coverage.c, colour=CI.type, linetype=CI.type)) +
-  scale_linetype_manual(values=c("dotdash", "solid")) +
-  scale_color_manual(values=c('#009900','#FF0000')) +
-  scale_size_manual(values=c(2, 1)) +
-  geom_hline(yintercept=.95, colour="#A0A0A0", linetype="longdash") +
-  ylim(0.4, 1) +
-  facet_grid(~ setting) +
-  labs(y = expression(Empirical~coverage~of~confidence~intervals~"for"~psi[0])) +
-  scale_x_continuous(
-    name="Log sample size",
-    limits = c(log(200), log(5500)),
-    breaks=c(log(250), log(500), log(1000), log(2500), log(5000)),
-    labels=c("log(250)", "log(500)", "log(1K)", "log(2.5K)", "log(5K)")) +
-  theme_bw() +
-  theme(legend.position="none",
-        text = element_text(size = 12))
+sim.2.gaussian.1 <- ret.1.1.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="No treatment effect null")
+sim.2.gaussian.2 <- ret.1.2.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Weak alternative")
+sim.2.gaussian.3 <- ret.1.3.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Moderate alternative")
+sim.2.gaussian.4 <- ret.1.4.est %>%
+  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
+  mutate(setting="Strong alternative")
 
-ggsave(file="Figures/Fig20_coverage_Sim1.eps", width = 290,
-       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig2a.plot) #saves g
+sim.2.gaussian.1 <- ret.1.1.est %>%
+  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
+  mutate(setting="No treatment effect null")
+sim.2.gaussian.2 <- ret.1.2.est %>%
+  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
+  mutate(setting="Weak alternative")
+sim.2.gaussian.3 <- ret.1.3.est %>%
+  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
+  mutate(setting="Moderate alternative")
+sim.2.gaussian.4 <- ret.1.4.est %>%
+  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
+  mutate(setting="Strong alternative")
+
+fig.sim.2.surv.bias.2 <- bind_rows(
+  sim.2.surv.1,
+  sim.2.surv.2,
+  sim.2.surv.3,
+  sim.2.surv.4)
+
+fig.sim.2.gaussian.bias.2 <- fig.sim.2.gaussian.bias.2 %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+                         (type == "simex.1") ~ "simex (correct)", 
+                         (type == "simex.2") ~ "simex (mild)",
+                         (type == "simex.3") ~ "simex (severe)"
+  ))
+
+fig.sim.2.gaussian.bias.2 <- fig.sim.2.gaussian.bias.2 %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+                         (type == "mecor.1") ~ "mecor (correct)", 
+                         (type == "mecor.2") ~ "mecor (mild)",
+                         (type == "mecor.3") ~ "mecor (severe)"
+  ))
+
+fig.sim.2.surv.bias.2$setting <- factor(fig.sim.2.surv.bias.2$setting,
+                                        levels = c("No treatment effect null",
+                                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
+fig.sim.2.surv.bias.2.plot.simex <- fig.sim.2.surv.bias.2%>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() + 
+  theme(legend.position="bottom")
+
+
+fig.sim.2.gaussian.bias.2 <- bind_rows(
+  sim.2.gaussian.1,
+  sim.2.gaussian.2,
+  sim.2.gaussian.3,
+  sim.2.gaussian.4)
+
+fig.sim.2.gaussian.bias.2$setting <- factor(fig.sim.2.gaussian.bias.2$setting,
+                                        levels = c("No treatment effect null",
+                                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
+fig.sim.2.gaussian.bias.2.plot <- fig.sim.2.gaussian.bias.2%>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  # scale_x_continuous(limits = c(-0.05,0.1)) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +  
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_me_gaussian_bias_simex.eps", width = 240,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.plot) #saves g
