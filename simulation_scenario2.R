@@ -727,26 +727,107 @@ save(sim.2.gaussian.4.4.4.2500.pa, file="../sim.data/sim.2.gaussian.4.4.4.2500.p
 sim.2.gaussian.4.4.2.2500.pa <- ret
 save(sim.2.gaussian.4.4.2.2500.pa, file="../sim.data/sim.2.gaussian.4.4.2.2500.pa.RData")
 
+#############
+# figures
+############
+# colnames.2
+file_par_list <- list("No treatment effect" = c(1,0),
+                       "Weak" = c(2,0.1),
+                       "Moderate" = c(3,0.5),
+                       "Strong" = c(4,1))
+colnames_list <- list("all.est" = c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                        "mecor.1", "mecor.2", "mecor.3", "mecor.4"),
+                      "all.se" = c("observed.se", "observed.cont.se","simex.se.1", "simex.se.2", "simex.se.3", "simex.se.4",
+                                   "mecor.se.1", "mecor.se.2", "mecor.se.3", "mecor.se.4"),
+                      "bias.1" = c("observed","simex.1", "mecor.1"),
+                      "bias.2.simex" = c("observed", "simex.1", "simex.2", "simex.3"),
+                      "bias.2.mecor" = c("observed", "mecor.1", "mecor.2", "mecor.3"))
+file_keys <- names(file_par_list)
 
+for (setting in file_keys){
+  index <- as.character(as.integer(file_par_list[[setting]][1]))
+  theta <- file_par_list[[setting]][2]
+  file_name = paste("../sim.data/sim.2.gaussian.4.4.", index, ".2500.pa.RData", sep="")
+  data_name = paste("sim.2.gaussian.4.4.", index, ".2500.pa", sep="")
+  load(file = file_name)
+  data <- get(data_name)
+  data.est <- data %>%
+    gather(key='type', value='est', colnames.2[1:20]) %>%
+    filter(type %in% colnames_list[["all.est"]]) %>%
+    mutate(bias=est-(theta)) %>%
+    mutate(setting = setting)
+  data.se <- data %>%
+    gather(key='se.type', value='se', colnames.2[1:20]) %>%
+    filter(se.type %in% colnames_list[["all.se"]])
+  
+  ret_name <- paste("ret.", index, sep="")
+  data <- cbind(data.est, data.se)[c(1,2,3,4,5,6,7,11,12)]
+  assign(ret_name, data)
+}
 
+summary.data <- bind_rows(
+  ret.1,
+  ret.2,
+  ret.3,
+  ret.4)
 
-colnames.2 <- colnames(ret)[1:20]
-load(file = "../sim.data/sim.2.gaussian.4.4.1.2500.pa.RData")
-ret.1.1.est <- sim.2.gaussian.4.4.1.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0))
-ret.1.1.est %>% group_by(type) %>%
+summary.data$setting <- factor(summary.data$setting,
+                               levels = c("No treatment effect",
+                                          "Weak", "Moderate", "Strong"))
+
+fig.sim.2.gaussian.bias.1.plot <- summary.data %>%
+  filter(type %in% colnames_list[["bias.1"]]) %>%
+  ggplot(aes(x=bias, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme(legend.position="bottom")
+
+fig.sim.2.gaussian.bias.2.simex.plot <- summary.data %>%
+  filter(type %in% colnames_list[["bias.2.mecor"]]) %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+                         (type == "simex.1") ~ "simex (correct)", 
+                         (type == "simex.2") ~ "simex (mild)",
+                         (type == "simex.3") ~ "simex (severe)")) %>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  # scale_x_continuous(limits = c(-0.05,0.1)) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +  
+  theme(legend.position="bottom")
+
+fig.sim.2.gaussian.bias.2.mecor.plot <- summary.data %>%
+  filter(type %in% colnames_list[["bias.2.mecor"]]) %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+                         (type == "mecor.1") ~ "mecor (correct)", 
+                         (type == "mecor.2") ~ "mecor (mild)",
+                         (type == "mecor.3") ~ "mecor (severe)")) %>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  # scale_x_continuous(limits = c(-0.05,0.1)) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +  
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_me_gaussian_bias_simex.eps", width = 240,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.plot)
+
+# coverage
+ret.3 %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= 0.5 & 0.5 <= ul)) %>%
+  group_by(type) %>%
   summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-ret.1.1.se <- sim.2.gaussian.4.4.1.2500.pa %>%
-  gather(key='se.type', value='se', colnames.2[1:20]) %>%
-  filter(se.type %in% c("observed.se", "observed.cont.se","simex.se.1", "simex.se.2", "simex.se.3", "simex.se.4",
-                        "mecor.se.1", "mecor.se.2", "mecor.se.3", "mecor.se.4"))
+            bias.mean = mean(abs(bias)),
+            coverage = mean(coverage))
 
-ret.1.1 <- cbind(ret.1.1.est, ret.1.1.se)[c(1,2,3,4,5,6,10,11)]
-ret.1.1 %>%
+ret.1 %>%
   mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
          ul=est+qnorm(1-(1-0.95)/2)*se) %>%
   mutate(coverage=(ll <= 0 & 0 <= ul)) %>%
@@ -755,57 +836,26 @@ ret.1.1 %>%
             bias.mean = mean(abs(bias)),
             coverage = mean(coverage))
 
-ret.1.1.est <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5))
-ret.1.1.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-ret.1.1.se <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='se.type', value='se', colnames.2[1:20]) %>%
-  filter(se.type %in% c("observed.se", "observed.cont.se","simex.se.1", "simex.se.2", "simex.se.3", "simex.se.4",
-                        "mecor.se.1", "mecor.se.2", "mecor.se.3", "mecor.se.4"))
-
-ret.1.1 <- cbind(ret.1.1.est, ret.1.1.se)[c(1,2,3,4,5,6,10,11)]
-
-ret.1.1 %>%
+ret.2 %>%
   mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
          ul=est+qnorm(1-(1-0.95)/2)*se) %>%
-  mutate(coverage=(ll <= 0.5 & 0.5 <= ul)) %>%
+  mutate(coverage=(ll <= 0.1 & 0.1 <= ul)) %>%
   group_by(type) %>%
-  summarise(cnt=n(),
-            est.mean = mean(est),
+  summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
             coverage = mean(coverage))
 
-# TODO3: why se small for all model
-
-sim.2.gaussian.4.4.3.2500.pa.B500 %>%
-  mutate(ll=simex.1.B500-qnorm(1-(1-0.95)/2)*simex.se.1.B500,
-         ul=simex.1.B500+qnorm(1-(1-0.95)/2)*simex.se.1.B500,
-         bias=simex.1.B500-(0.5)) %>%
-  mutate(coverage=(ll <= 0.5 & 0.5 <= ul),
-         setting="B500") %>%
-  group_by(setting) %>%
-  summarise(
+ret.4 %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= 1 & 1 <= ul)) %>%
+  group_by(type) %>%
+  summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
             coverage = mean(coverage))
 
-sim.2.gaussian.4.4.3.5000.pa.1 %>%
-  mutate(ll=simex.1-qnorm(1-(1-0.95)/2)*simex.se.1,
-         ul=simex.1+qnorm(1-(1-0.95)/2)*simex.se.1,
-         bias=simex.1-(0.5)) %>%
-  mutate(coverage=(ll <= 0.5 & 0.5 <= ul),
-         setting="n5000") %>%
-  group_by(setting) %>%
-  summarise(
-    bias.mean = mean(abs(bias)),
-    coverage = mean(coverage))
-
-head(sim.2.gaussian.4.4.3.5000.pa.1)
-
+ #saves g
+#################
 # pair t test
 simex.1.bias <- ret.1.3.est[ret.1.3.est$type=="simex.1","bias"]
 mecor.1.bias <- ret.1.3.est[ret.1.3.est$type=="mecor.1","bias"]
@@ -825,11 +875,8 @@ sim.2.gaussian.4.4.3.2500.pa <- rbind(sim.2.gaussian.4.4.3.2500.pa, ret)
 
 tail(sim.2.gaussian.4.4.3.2500.pa)
 
-
-
-
-
-
+#################
+# debug
 load(file = "../sim.data/tmp.ret.10.RData")
 head(ret)
 sim.2.gaussian.4.4.3.2500.pa.B500 <- ret
@@ -857,7 +904,7 @@ for (n in 2500) {
                                                     eta_t3=c(0,-0.2,-0.4,-0.6,-0.8,-1)))
     
     try({
-
+      
       # simex
       sim.data$X3.star.cont <- as.numeric(sim.data$X3.star)-1
       naive.model.continuous <- glm(Y ~ A + X1 + X2 + X3.star.cont, family = "gaussian", data=sim.data, x=T, y=T)
@@ -882,120 +929,3 @@ for (n in 2500) {
     
   }
 }
-
-
-
-
-
-
-
-
-
-
-ret.1.2.est <- sim.2.gaussian.4.4.2.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.1))
-ret.1.2.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
-ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5))
-ret.1.3.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
-ret.1.4.est <- sim.2.gaussian.4.4.4.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(1))
-ret.1.4.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
-sim.2.gaussian.1 <- ret.1.1.est %>%
-  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
-  mutate(setting="No treatment effect null")
-sim.2.gaussian.2 <- ret.1.2.est %>%
-  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
-  mutate(setting="Weak alternative")
-sim.2.gaussian.3 <- ret.1.3.est %>%
-  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
-  mutate(setting="Moderate alternative")
-sim.2.gaussian.4 <- ret.1.4.est %>%
-  filter(type %in% c("observed", "simex.1", "simex.2", "simex.3")) %>%
-  mutate(setting="Strong alternative")
-
-sim.2.gaussian.1 <- ret.1.1.est %>%
-  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
-  mutate(setting="No treatment effect null")
-sim.2.gaussian.2 <- ret.1.2.est %>%
-  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
-  mutate(setting="Weak alternative")
-sim.2.gaussian.3 <- ret.1.3.est %>%
-  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
-  mutate(setting="Moderate alternative")
-sim.2.gaussian.4 <- ret.1.4.est %>%
-  filter(type %in% c("observed", "mecor.1", "mecor.2", "mecor.3")) %>%
-  mutate(setting="Strong alternative")
-
-fig.sim.2.surv.bias.2 <- bind_rows(
-  sim.2.surv.1,
-  sim.2.surv.2,
-  sim.2.surv.3,
-  sim.2.surv.4)
-
-fig.sim.2.gaussian.bias.2 <- fig.sim.2.gaussian.bias.2 %>%
-  mutate(model=case_when((type == "observed") ~ "observed",
-                         (type == "simex.1") ~ "simex (correct)", 
-                         (type == "simex.2") ~ "simex (mild)",
-                         (type == "simex.3") ~ "simex (severe)"
-  ))
-
-fig.sim.2.gaussian.bias.2 <- fig.sim.2.gaussian.bias.2 %>%
-  mutate(model=case_when((type == "observed") ~ "observed",
-                         (type == "mecor.1") ~ "mecor (correct)", 
-                         (type == "mecor.2") ~ "mecor (mild)",
-                         (type == "mecor.3") ~ "mecor (severe)"
-  ))
-
-fig.sim.2.surv.bias.2$setting <- factor(fig.sim.2.surv.bias.2$setting,
-                                        levels = c("No treatment effect null",
-                                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
-fig.sim.2.surv.bias.2.plot.simex <- fig.sim.2.surv.bias.2%>%
-  ggplot(aes(x=bias, colour = model)) +
-  geom_density() +
-  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
-  facet_grid(~ setting) +
-  labs(x="Bias", y = "Bias distribution density") + 
-  theme_bw() + 
-  theme(legend.position="bottom")
-
-
-fig.sim.2.gaussian.bias.2 <- bind_rows(
-  sim.2.gaussian.1,
-  sim.2.gaussian.2,
-  sim.2.gaussian.3,
-  sim.2.gaussian.4)
-
-fig.sim.2.gaussian.bias.2$setting <- factor(fig.sim.2.gaussian.bias.2$setting,
-                                        levels = c("No treatment effect null",
-                                                   "Weak alternative", "Moderate alternative", "Strong alternative"))
-fig.sim.2.gaussian.bias.2.plot <- fig.sim.2.gaussian.bias.2%>%
-  ggplot(aes(x=bias, colour = model)) +
-  geom_density() +
-  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
-  facet_grid(~ setting) +
-  # scale_x_continuous(limits = c(-0.05,0.1)) +
-  labs(x="Bias", y = "Bias distribution density") + 
-  theme_bw() +  
-  theme(legend.position="bottom")
-
-ggsave(file="../figures/Fig_me_gaussian_bias_simex.eps", width = 240,
-       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.plot) #saves g
