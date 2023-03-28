@@ -605,7 +605,7 @@ generate.data.gaussian <- function(n, theta = c(0,1), p_ij=p_ij,
   # sample Y conditional on A and X
   sim.data$mu <- with(sim.data, 0.5 + theta[A] + eta_t$eta_t1[X1] + eta_t$eta_t2[X2] + eta_t$eta_t3[X3])
   sim.data$Y <- rnorm(n, mean=sim.data$mu, 
-                      sd=0.1)
+                      sd=1)
   
   return(sim.data)
 }
@@ -619,14 +619,14 @@ sim.data <- generate.data.gaussian(n=n, theta = c(0,0.5), p_ij = p_ij,
 
 ret <- data.frame()
 for (n in 2500) {
-  for (j in 1:500) {
+  for (j in 1:1000) {
     
     seed <- sample(1e3:1e8, 1)
     set.seed(seed)
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data.gaussian(n=n, theta = c(0,0.5), p_ij = p_ij,
+    sim.data <- generate.data.gaussian(n=n, theta = c(0,0.1), p_ij = p_ij,
                                        eta_a = list(eta_a1=c(0,-0.1),
                                                     eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
                                                     eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -727,45 +727,10 @@ save(sim.2.gaussian.4.4.4.2500.pa, file="../sim.data/sim.2.gaussian.4.4.4.2500.p
 sim.2.gaussian.4.4.2.2500.pa <- ret
 save(sim.2.gaussian.4.4.2.2500.pa, file="../sim.data/sim.2.gaussian.4.4.2.2500.pa.RData")
 
-# plot
-# check the bias distribution
-sim.2.gaussian.4.4.1.2500.pa %>%
-  gather(key='type', value='est', colnames(ret)[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0)) %>%
-  ggplot(aes(x=bias, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
+
+
 
 colnames.2 <- colnames(ret)[1:20]
-ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5))
-ret.1.3.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
-ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5))
-ret.1.3.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
-ret.1.3.est <- sim.2.gaussian.4.4.3.2500.pa %>%
-  gather(key='type', value='est', colnames.2[1:20]) %>%
-  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
-                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
-  mutate(bias=est-(0.5))
-ret.1.3.est %>% group_by(type) %>%
-  summarise(est.mean = mean(est),
-            bias.mean = mean(abs(bias)))
-
 load(file = "../sim.data/sim.2.gaussian.4.4.1.2500.pa.RData")
 ret.1.1.est <- sim.2.gaussian.4.4.1.2500.pa %>%
   gather(key='type', value='est', colnames.2[1:20]) %>%
@@ -789,6 +754,144 @@ ret.1.1 %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
             coverage = mean(coverage))
+
+ret.1.1.est <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames.2[1:20]) %>%
+  filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mecor.1", "mecor.2", "mecor.3", "mecor.4")) %>%
+  mutate(bias=est-(0.5))
+ret.1.1.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+ret.1.1.se <- sim.2.gaussian.4.4.3.2500.pa %>%
+  gather(key='se.type', value='se', colnames.2[1:20]) %>%
+  filter(se.type %in% c("observed.se", "observed.cont.se","simex.se.1", "simex.se.2", "simex.se.3", "simex.se.4",
+                        "mecor.se.1", "mecor.se.2", "mecor.se.3", "mecor.se.4"))
+
+ret.1.1 <- cbind(ret.1.1.est, ret.1.1.se)[c(1,2,3,4,5,6,10,11)]
+
+ret.1.1 %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= 0.5 & 0.5 <= ul)) %>%
+  group_by(type) %>%
+  summarise(cnt=n(),
+            est.mean = mean(est),
+            bias.mean = mean(abs(bias)),
+            coverage = mean(coverage))
+
+# TODO3: why se small for all model
+
+sim.2.gaussian.4.4.3.2500.pa.B500 %>%
+  mutate(ll=simex.1.B500-qnorm(1-(1-0.95)/2)*simex.se.1.B500,
+         ul=simex.1.B500+qnorm(1-(1-0.95)/2)*simex.se.1.B500,
+         bias=simex.1.B500-(0.5)) %>%
+  mutate(coverage=(ll <= 0.5 & 0.5 <= ul),
+         setting="B500") %>%
+  group_by(setting) %>%
+  summarise(
+            bias.mean = mean(abs(bias)),
+            coverage = mean(coverage))
+
+sim.2.gaussian.4.4.3.5000.pa.1 %>%
+  mutate(ll=simex.1-qnorm(1-(1-0.95)/2)*simex.se.1,
+         ul=simex.1+qnorm(1-(1-0.95)/2)*simex.se.1,
+         bias=simex.1-(0.5)) %>%
+  mutate(coverage=(ll <= 0.5 & 0.5 <= ul),
+         setting="n5000") %>%
+  group_by(setting) %>%
+  summarise(
+    bias.mean = mean(abs(bias)),
+    coverage = mean(coverage))
+
+head(sim.2.gaussian.4.4.3.5000.pa.1)
+
+# pair t test
+simex.1.bias <- ret.1.3.est[ret.1.3.est$type=="simex.1","bias"]
+mecor.1.bias <- ret.1.3.est[ret.1.3.est$type=="mecor.1","bias"]
+observed.bias <- ret.1.3.est[ret.1.3.est$type=="observed","bias"]
+
+res <- t.test(simex.1.bias, mecor.1.bias, alternative="greater", paired = TRUE)
+res <- t.test(observed.bias, simex.1.bias, alternative="greater", paired = TRUE)
+
+t.test(biasret.1.3.est, alternative="greater", paired = TRUE)
+res
+
+table(ret.1.1$type)
+head(ret.1.1)
+sim.2.gaussian.4.4.3.2500.pa$seed[1:10]
+
+sim.2.gaussian.4.4.3.2500.pa <- rbind(sim.2.gaussian.4.4.3.2500.pa, ret)
+
+tail(sim.2.gaussian.4.4.3.2500.pa)
+
+
+
+
+
+
+load(file = "../sim.data/tmp.ret.10.RData")
+head(ret)
+sim.2.gaussian.4.4.3.2500.pa.B500 <- ret
+save(sim.2.gaussian.4.4.3.5000.pa.1, file="../sim.data/sim.2.gaussian.4.4.3.5000.pa.1.RData")
+save(sim.2.gaussian.4.4.3.2500.pa.B500, file="../sim.data/sim.2.gaussian.4.4.3.2500.pa.B500.RData")
+# increase B
+# increase n
+# increase j
+ret <- data.frame()
+for (n in 2500) {
+  for (j in 1:500) {
+    
+    # seed <- sample(1e3:1e8, 1)
+    seed <- sim.2.gaussian.4.4.3.2500.pa[sim.2.gaussian.4.4.3.2500.pa$j==j,"seed"]
+    set.seed(seed)
+    cat(n, j, seed, '\n')
+    
+    # generate data
+    sim.data <- generate.data.gaussian(n=n, theta = c(0,0.5), p_ij = p_ij,
+                                       eta_a = list(eta_a1=c(0,-0.1),
+                                                    eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                                    eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
+                                       eta_t = list(eta_t1=c(0,-0.1),
+                                                    eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                                    eta_t3=c(0,-0.2,-0.4,-0.6,-0.8,-1)))
+    
+    try({
+
+      # simex
+      sim.data$X3.star.cont <- as.numeric(sim.data$X3.star)-1
+      naive.model.continuous <- glm(Y ~ A + X1 + X2 + X3.star.cont, family = "gaussian", data=sim.data, x=T, y=T)
+      var.true <- var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star))
+      fit.simex.1 <- simex(naive.model.continuous,
+                           measurement.error = var.true, 
+                           SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
+      theta.hat.simex.1 <- fit.simex.1$coefficients[2]
+      theta.hat.simex.se.1 <- sqrt(fit.simex.1$variance.jackknife[2,2])
+      
+      if (length(ret)>0){
+        ret.tmp <- data.frame(
+          simex.1 = theta.hat.simex.1, simex.se.1 = theta.hat.simex.se.1,
+          n=n, j=j, seed=seed)
+        
+        ret <- rbind(ret, ret.tmp)
+      } else {
+        ret <- data.frame(simex.1 = theta.hat.simex.1, simex.se.1 = theta.hat.simex.se.1,
+                          n=n, j=j, seed=seed)
+      }
+    })
+    
+  }
+}
+
+
+
+
+
+
+
+
+
+
 ret.1.2.est <- sim.2.gaussian.4.4.2.2500.pa %>%
   gather(key='type', value='est', colnames.2[1:20]) %>%
   filter(type %in% c("observed", "observed.cont","simex.1", "simex.2", "simex.3", "simex.4",
