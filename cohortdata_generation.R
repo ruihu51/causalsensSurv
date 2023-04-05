@@ -133,4 +133,78 @@ U <- rbinom(n, 1, 0.5) # the simplest setup
 U <- runif(n, 0, 1)
 U <- rnorm(n, 0, 1)
 
+# add real data interpretation
+# data (Y,D,A,W,X.star) A-0,1,2
+# naive model
+# 1 vs 0 - 0.88
+# 2 vs 0 - 0.83
+# take 1 vs 0 as the example
+theta.hat.naive <- -0.12
+# confidence intervals - (ll,ul), 0 - not include zero
+
+# unmeasured confounding
+# (alpha, beta) = (1,1), (2,2)
+fit.stoEM_reg <- survSensitivity(sim.data$Y, sim.data$D, A, X, "stoEM_reg",
+                                 zetaT = beta, zetaZ = alpha,
+                                 B = 5)
+theta.hat.stoEM_reg <- fit.stoEM_reg$tau1
+theta.hat.stoEM_reg.se <- fit.stoEM_reg$tau1.se
+
+# result table & interpretation
+# alpha | beta | theta.hat.stoEM | CI
+# -------------------------------------
+# 0 | 0 | -0.12 | (ll,ul), 0
+# 1 | 1 | -0.07 | (ll,ul), 0
+# 2 | 2 | -0.01 | (ll,0,ul)
+# problematic when the true effect is zero and the naive estimate suggests significantly different from zero
+# add citation: a strong unmeasured confounder would be usually known
+
+# okay if the previous result is conservative, i.e., theta.hat.naive underestimate
+# say theta.hat.stoEM_reg=-0.25
+# TODO: check the simulation result
+# TODO: may be add simulation at the null
+
+# residual confounding
+sim.data$X3.star.cont <- as.numeric(sim.data$X3.star)-1
+naive.model.continuous <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3.star.cont, data=sim.data, model = TRUE)
+var.true <- 0.5 # 0.8, 1, 1.5 or related to var(Y) 
+# TODO: add simulation
+fit.simex.1 <- simex(naive.model.continuous, measurement.error = var.true, 
+                     SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
+theta.hat.simex.1 <- fit.simex.1$coefficients[1]
+theta.hat.simex.se.1 <- sqrt(fit.simex.1$variance.jackknife[1,1])
+
+# need to find theoretical evidence saying that simex is not sensitive to misspecification?
+# result table & interpretation
+# sigma^2 | theta.hat.simex | CI
+# -------------------------------------
+# 0.5 | -0.08 | (ll,ul), 0
+
+# TODO: check simulation result when true effect is what theta.hat.naive looks like
+# TODO: check sec 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -153,7 +153,6 @@ theta.hat.mcsimex.se.4 <- sqrt(fit.mcsimex.4$variance.jackknife[1,1])
 # simex
 sim.data$X3.star.cont <- as.numeric(sim.data$X3.star)-1
 naive.model.continuous <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3.star.cont, data=sim.data, model = TRUE)
-var.true <- var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star))
 fit.simex.1 <- simex(naive.model.continuous, measurement.error = var.true, 
                      SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
 theta.hat.simex.1 <- fit.simex.1$coefficients[1]
@@ -782,14 +781,16 @@ fig.sim.2.gaussian.bias.1.plot <- summary.data %>%
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
   facet_grid(~ setting) +
   labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +
   theme(legend.position="bottom")
 
 fig.sim.2.gaussian.bias.2.simex.plot <- summary.data %>%
-  filter(type %in% colnames_list[["bias.2.mecor"]]) %>%
+  filter(type %in% colnames_list[["bias.2.simex"]]) %>%
   mutate(model=case_when((type == "observed") ~ "observed",
                          (type == "simex.1") ~ "simex (correct)", 
                          (type == "simex.2") ~ "simex (mild)",
                          (type == "simex.3") ~ "simex (severe)")) %>%
+  mutate(model=factor(model, levels=c("observed", "simex (correct)", "simex (mild)", "simex (severe)"))) %>%
   ggplot(aes(x=bias, colour = model)) +
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
@@ -805,6 +806,7 @@ fig.sim.2.gaussian.bias.2.mecor.plot <- summary.data %>%
                          (type == "mecor.1") ~ "mecor (correct)", 
                          (type == "mecor.2") ~ "mecor (mild)",
                          (type == "mecor.3") ~ "mecor (severe)")) %>%
+  mutate(model=factor(model, levels=c("observed", "mecor (correct)", "mecor (mild)", "mecor (severe)"))) %>%
   ggplot(aes(x=bias, colour = model)) +
   geom_density() +
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
@@ -813,9 +815,12 @@ fig.sim.2.gaussian.bias.2.mecor.plot <- summary.data %>%
   labs(x="Bias", y = "Bias distribution density") + 
   theme_bw() +  
   theme(legend.position="bottom")
-
+ggsave(file="../figures/Fig_me_gaussian_bias.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.1.plot)
 ggsave(file="../figures/Fig_me_gaussian_bias_simex.eps", width = 240,
-       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.plot)
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.simex.plot)
+ggsave(file="../figures/Fig_me_gaussian_bias_mecor.eps", width = 240,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.gaussian.bias.2.mecor.plot)
 
 # coverage
 ret.3 %>%
@@ -853,8 +858,43 @@ ret.4 %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
             coverage = mean(coverage))
+#################
+# TODO 2: check the measurement error variance and 
+# correct
+var.true.list <- c()
+for (i in 1:500){
+  print(i)
+  X3 <- factor(sample(0:5, size = n, replace = TRUE, 
+                      prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
+  X3.star <- factor(unlist(lapply(X3, gen_chd_given_parents, category=levels(X3), prob_matrix=p_ij)))
+  var.true.list[i] <- var(as.numeric(X3)-as.numeric(X3.star))
+}
+plot(density(var.true.list))
 
- #saves g
+# prob_matrix -> variance but variance doesn't point to 
+
+# mild
+var.true.list.mild <- c()
+for (i in 1:500){
+  print(i)
+  X3 <- factor(sample(0:5, size = n, replace = TRUE, 
+                      prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
+  X3.star <- factor(unlist(lapply(X3, gen_chd_given_parents, category=levels(X3), prob_matrix=p_ij.2)))
+  var.true.list.mild[i] <- var(as.numeric(X3)-as.numeric(X3.star))
+}
+plot(density(var.true.list.mild))
+
+# severe
+var.true.list.severe <- c()
+for (i in 1:500){
+  print(i)
+  X3 <- factor(sample(0:5, size = n, replace = TRUE, 
+                      prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
+  X3.star <- factor(unlist(lapply(X3, gen_chd_given_parents, category=levels(X3), prob_matrix=p_ij.3)))
+  var.true.list.severe[i] <- var(as.numeric(X3)-as.numeric(X3.star))
+}
+plot(density(var.true.list.severe))
+
 #################
 # pair t test
 simex.1.bias <- ret.1.3.est[ret.1.3.est$type=="simex.1","bias"]
