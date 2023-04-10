@@ -76,3 +76,10 @@ generate.data.gaussian <- function(n, theta = c(0,-1), p_ij=p_ij,
   
   return(sim.data)
 }
+
+gen_chd_given_parents <- function(parents, category, prob_matrix){
+  j <- which(category==parents)
+  sample_prob <- prob_matrix[,j]
+  chd <- sample(0:(length(category)-1), size = 1, replace = TRUE, prob = sample_prob)
+  return(chd)
+}

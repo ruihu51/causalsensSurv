@@ -29,8 +29,8 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,1),
   X3 <- factor(sample(0:5, size = n, replace = TRUE, 
                       prob = c(0.21, 0.30, 0.21, 0.15, 0.10, 0.03)))
   # U: unmeasured confounder
-  # U <- rbinom(n, 1, p=0.5) # dist-1
-  U <- rnorm(n, 0, 1) # dist-2
+  U <- rbinom(n, 1, p=0.5) # dist-1
+  # U <- rnorm(n, 0, 1) # dist-2
   # U <- runif(n, 0, 1) # dist-3
   sim.data <- data.frame(X1=X1, X2=X2, X3=X3, U=U)
   
@@ -57,8 +57,8 @@ generate.data <- function(n, alpha=0, beta=0, theta = c(0,1),
   return(sim.data)
 }
 
-alpha <- 1
-beta <- 1
+alpha <-  2
+beta <- 2
 ret <- data.frame()
 for (n in 2500) {
   for (j in 1:500) {
@@ -68,7 +68,7 @@ for (n in 2500) {
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data(n=n, alpha=alpha, beta=beta)
+    sim.data <- generate.data(n=n, alpha=alpha, beta=beta, theta = c(0,0))
     
     try({
       fit.naive <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3, data=sim.data)
@@ -128,56 +128,12 @@ save(sim.1.1.1.2.2500.pa, file="../sim.data/sim.1.1.1.2.2500.pa.RData")
 sim.1.1.1.3.2500.pa <- sim.1.1.1.1.2500.pa
 save(sim.1.1.1.3.2500.pa, file="../sim.data/sim.1.1.1.3.2500.pa.RData")
 
-# plot
-ret %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  ggplot(aes(x=est, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", 0, ", ", beta, "=", 0)))
+load(file="../sim.data/sim.1.1.1.1.2500.pa.RData")
 
-ret %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  ggplot(aes(x=est, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1)))
+# TODO: add simulation when theta=0
+sim.1.0.0.1.1.2500.pa <- ret
+save(sim.1.0.0.1.1.2500.pa, file="../sim.data/sim.1.0.0.1.1.2500.pa.RData")
 
-ret %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  ggplot(aes(x=est, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", -2, ", ", beta, "=", 2)))
-
-ret %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  ggplot(aes(x=est, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~N(0,1)")))
-
-ret %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  ggplot(aes(x=est, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = -1, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~unif(0,1)")))
-
-# TODO: check the bias distribution
-sim.1.n1.1.2.2500.pa %>%
-  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
-  filter(type %in% c("naive","stoEM_reg")) %>%
-  mutate(bias=est-(-1)) %>%
-  ggplot(aes(x=bias, colour = type)) +
-  geom_density() +
-  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") +
-  ggtitle(expression(paste(alpha, "=", -1, ", ", beta, "=", 1, ", ", "U~N(0,1)")))
 
 # Fig 1a
 sim.1.0 <- sim.1.0.0.1.2500.pa %>%

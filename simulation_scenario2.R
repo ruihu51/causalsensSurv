@@ -79,8 +79,14 @@ p_ij.4 <- matrix(c(0.85, 0.02, 0.01, 0.01, 0.01, 0.01,
                    0.01, 0.01, 0.1, 0.85, 0.1, 0.02,
                    0.01, 0.01, 0.01, 0.1, 0.85, 0.1,
                    0.01, 0.01, 0.01, 0.01, 0.02, 0.85), nrow = 6, byrow = TRUE)
+p_ij.5 <- matrix(c(0.6, 0.14, 0.02, 0.02, 0.02, 0.02,
+                   0.3, 0.6, 0.14, 0.02, 0.02, 0.02,
+                   0.04, 0.2, 0.6, 0.14, 0.02, 0.02,
+                   0.02, 0.02, 0.2, 0.6, 0.2, 0.04,
+                   0.02, 0.02, 0.02, 0.2, 0.6, 0.3,
+                   0.02, 0.02, 0.02, 0.02, 0.14, 0.6), nrow = 6, byrow = TRUE) # why 0.7,0.2 doesn't work
 n <- 2500
-sim.data <- generate.data(n=n, theta = c(0,0.5), p_ij = p_ij,
+sim.data <- generate.data(n=n, theta = c(0,0.5), p_ij = p_ij.5,
                           eta_a = list(eta_a1=c(0,-0.1),
                                        eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
                                        eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -92,6 +98,14 @@ dimnames(p_ij) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
 dimnames(p_ij.2) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
 dimnames(p_ij.3) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
 dimnames(p_ij.4) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
+dimnames(p_ij.5) <- list(levels(sim.data$X3.star), levels(sim.data$X3.star))
+
+X3 <- sim.data$X3
+X3.star <- sim.data$X3.star
+data.frame(table(X3,X3.star)) %>%
+  ggplot(aes(x=X3, y=Freq, fill=X3.star)) + geom_bar(stat="identity")
+
+var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star))
 
 seed <- ret$seed[183]
 for (i in 183){
@@ -184,7 +198,7 @@ for (n in 2500) {
     cat(n, j, seed, '\n')
     
     # generate data
-    sim.data <- generate.data(n=n, theta = c(0,0.1), p_ij = p_ij,
+    sim.data <- generate.data(n=n, theta = c(0,0.5), p_ij = p_ij,
                               eta_a = list(eta_a1=c(0,-0.1),
                                            eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
                                            eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
@@ -310,6 +324,90 @@ sim.2.surv.4.4.4.2500.pa <- ret
 save(sim.2.surv.4.4.4.2500.pa, file="../sim.data/sim.2.surv.4.4.4.2500.pa.RData")
 sim.2.surv.4.4.2.2500.pa <- ret
 save(sim.2.surv.4.4.2.2500.pa, file="../sim.data/sim.2.surv.4.4.2.2500.pa.RData")
+
+
+# add simulation
+ret <- data.frame()
+system.time(for (n in 2500) {
+  for (j in 1:10) {
+    
+    seed <- sim.2.surv.4.4.3.2500.pa[sim.2.surv.4.4.3.2500.pa$j==j,"seed"]
+    set.seed(seed)
+    cat(n, j, seed, '\n')
+    
+    # generate data
+    sim.data <- generate.data(n=n, theta = c(0,0.5), p_ij = p_ij,
+                              eta_a = list(eta_a1=c(0,-0.1),
+                                           eta_a2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                           eta_a3=c(0,-0.2,-0.4,-0.6,-0.8,-1)), 
+                              eta_t = list(eta_t1=c(0,-0.1),
+                                           eta_t2=c(0,-0.01,-0.02,-0.03,-0.04),
+                                           eta_t3=c(0,-0.2,-0.4,-0.6,-0.8,-1)))
+    
+    try({
+      # true
+      fit.true <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3, data=sim.data)
+      theta.hat.true <- fit.true$coefficients[1]
+      theta.hat.true.se <- sqrt(fit.true$var[1,1])
+      
+      # observed adjusted causal hazard ratio
+      fit.obs <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3.star, data=sim.data)
+      theta.hat.obs <- fit.obs$coefficients[1]
+      theta.hat.obs.se <- sqrt(fit.obs$var[1,1])
+      
+      # crude effect
+      fit.crude <- coxph(Surv(Y, D) ~ A + X1 + X2, data=sim.data)
+      theta.hat.crude <- fit.crude$coefficients[1]
+      theta.hat.crude.se <- sqrt(fit.crude$var[1,1])
+      
+      # simex
+      sim.data$X3.star.cont <- as.numeric(sim.data$X3.star)-1
+      naive.model.continuous <- coxph(Surv(Y, D) ~ A + X1 + X2 + X3.star.cont, data=sim.data, model = TRUE)
+      var.true <- var(as.numeric(sim.data$X3)-as.numeric(sim.data$X3.star))
+      
+      est.list <- c()
+      se.list <- c()
+      for (var.true in c(1,1.5,2)){
+        fit.simex <- simex(naive.model.continuous, measurement.error = var.true, 
+                              SIMEXvariable = c("X3.star.cont"), asymptotic = FALSE)
+        est.list <- append(est.list, fit.simex$coefficients[1])
+        se.list <- append(se.list, sqrt(fit.simex$variance.jackknife[1,1]))
+      }
+      est <- paste(est.list, collapse = "_")
+      se <- paste(se.list, collapse = "_")
+      
+      if (length(ret)>0){
+        ret.tmp <- data.frame(true = theta.hat.true, true.se = theta.hat.true.se,
+                              observed = theta.hat.obs, observed.se = theta.hat.obs.se, 
+                              crude = theta.hat.crude, crude.se = theta.hat.crude.se, 
+                              est = est, se = se, 
+                              n=n, j=j, seed=seed)
+        
+        ret <- rbind(ret, ret.tmp)
+      } else {
+        ret <- data.frame(true = theta.hat.true, true.se = theta.hat.true.se,
+                          observed = theta.hat.obs, observed.se = theta.hat.obs.se, 
+                          crude = theta.hat.crude, crude.se = theta.hat.crude.se, 
+                          est = est, se = se, 
+                          n=n, j=j, seed=seed)
+      }
+    })
+    
+  }
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
 # summary
 
 sim.2.surv.4.4.3.2500.pa %>%
@@ -725,6 +823,121 @@ sim.2.gaussian.4.4.4.2500.pa <- ret
 save(sim.2.gaussian.4.4.4.2500.pa, file="../sim.data/sim.2.gaussian.4.4.4.2500.pa.RData")
 sim.2.gaussian.4.4.2.2500.pa <- ret
 save(sim.2.gaussian.4.4.2.2500.pa, file="../sim.data/sim.2.gaussian.4.4.2.2500.pa.RData")
+
+# TODO: add simulations on severe misspecification and its relation to the variance of Y or X?
+
+
+
+
+
+
+
+
+# result
+simex.sim.ret.3
+
+d1 <- do.call(rbind.data.frame, simex.sim.ret.4)
+d2 <- do.call(rbind.data.frame, simex.sim.ret.3.300)
+d3 <- do.call(rbind.data.frame, simex.sim.ret.4.500)
+
+load("../sim.data/simex.sim.ret.4.RData")
+
+
+sim.2.surv.4.4.4.2500.pa.s1 <- bind_rows(d1, d3)
+
+
+split_str <- function(x){
+  return(as.numeric(unlist(strsplit(x, "_"))))
+}
+
+est.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.4.2500.pa.s1$est, split_str))
+colnames(est.dat) <- c("simex.5", "simex.6", "simex.7")
+
+se.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.4.2500.pa.s1$se, split_str))
+colnames(se.dat) <- c("simex.se.5", "simex.se.6", "simex.se.7")
+
+sim.2.surv.4.4.4.2500.pa.s1 <- cbind(sim.2.surv.4.4.4.2500.pa.s1, est.dat)
+
+sim.2.surv.4.4.4.2500.pa.s1 <- cbind(sim.2.surv.4.4.4.2500.pa.s1, se.dat)
+
+save(sim.2.surv.4.4.4.2500.pa.s1, file = "../sim.data/sim.2.surv.4.4.4.2500.pa.s1.RData")
+load("../sim.data/sim.2.surv.4.4.3.2500.pa.s1.RData")
+ret.4.est <- sim.2.surv.4.4.4.2500.pa.s1 %>%
+  gather(key='type', value='est', c("true", "observed", "crude",
+                                    "simex.5", "simex.6", "simex.7")) %>%
+  filter(type %in% c("true", "observed", "crude",
+                     "simex.5", "simex.6", "simex.7")) %>%
+  mutate(bias=est-(1))
+
+head(sim.2.surv.4.4.4.2500.pa.s1)
+
+ret.4.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+library(stringr)
+
+# manipulate new simulated result
+
+
+d2 <- do.call(rbind.data.frame, simex.sim.ret.4.L.300)
+d3 <- do.call(rbind.data.frame, simex.sim.ret.4.L.500)
+
+sim.2.surv.4.4.4.2.2500.pa <- bind_rows(d2, d3)
+head(d1)
+##
+load("../sim.data/simex.sim.ret.1.L.RData")
+sim.2.surv.4.4.3.2.2500.pa <- do.call(rbind.data.frame, simex.sim.ret.3.L)
+# c(0.3,0.5,0.8,1,1.5,2)
+est.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.3.2.2500.pa$est, split_str))
+colnames(est.dat) <- c("simex.0", "simex.2", "simex.3", "simex.5", "simex.6", "simex.7")
+
+se.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.3.2.2500.pa$se, split_str))
+colnames(se.dat) <- c("simex.se.0", "simex.se.2", "simex.se.3", "simex.se.5", "simex.se.6", "simex.se.7")
+
+sim.2.surv.4.4.3.2.2500.pa <- cbind(sim.2.surv.4.4.3.2.2500.pa, est.dat)
+
+sim.2.surv.4.4.3.2.2500.pa <- cbind(sim.2.surv.4.4.3.2.2500.pa, se.dat)
+
+ret.4.est <- sim.2.surv.4.4.4.2.2500.pa %>%
+  gather(key='type', value='est', c("true", "observed", "crude",
+                                    "simex.0", "simex.2", "simex.3",
+                                    "simex.5", "simex.6", "simex.7")) %>%
+  filter(type %in% c("true", "observed", "crude",
+                     "simex.0", "simex.2", "simex.3",
+                     "simex.5", "simex.6", "simex.7")) %>%
+  mutate(bias=est-(1))
+
+ret.4.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+
+save(sim.2.surv.4.4.4.2.2500.pa, file="sim.2.surv.4.4.4.2.2500.pa.RData")
+####################
+sim.2.surv.4.4.1.2.2500.pa <- do.call(rbind.data.frame, simex.sim.ret.1.L)
+# c(0.3,0.5,0.8,1,1.5,2)
+est.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.4.2.2500.pa$est, split_str))
+colnames(est.dat) <- c("simex.0", "simex.2", "simex.3", "simex.5", "simex.6", "simex.7")
+
+se.dat <- do.call(rbind.data.frame, lapply(sim.2.surv.4.4.4.2.2500.pa$se, split_str))
+colnames(se.dat) <- c("simex.se.0", "simex.se.2", "simex.se.3", "simex.se.5", "simex.se.6", "simex.se.7")
+
+sim.2.surv.4.4.4.2.2500.pa <- cbind(sim.2.surv.4.4.4.2.2500.pa, est.dat)
+
+sim.2.surv.4.4.4.2.2500.pa <- cbind(sim.2.surv.4.4.4.2.2500.pa, se.dat)
+
+ret.4.est <- sim.2.surv.4.4.4.2.2500.pa %>%
+  gather(key='type', value='est', c("true", "observed", "crude",
+                                    "simex.0", "simex.2", "simex.3",
+                                    "simex.5", "simex.6", "simex.7")) %>%
+  filter(type %in% c("true", "observed", "crude",
+                     "simex.0", "simex.2", "simex.3",
+                     "simex.5", "simex.6", "simex.7")) %>%
+  mutate(bias=est-(0.1))
+
+ret.4.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
 
 #############
 # figures

@@ -161,7 +161,8 @@ theta.hat.stoEM_reg.se <- fit.stoEM_reg$tau1.se
 
 # okay if the previous result is conservative, i.e., theta.hat.naive underestimate
 # say theta.hat.stoEM_reg=-0.25
-# TODO: check the simulation result
+# naive estimator tend to overestimate
+
 # TODO: may be add simulation at the null
 
 # residual confounding
@@ -178,20 +179,67 @@ theta.hat.simex.se.1 <- sqrt(fit.simex.1$variance.jackknife[1,1])
 # result table & interpretation
 # sigma^2 | theta.hat.simex | CI
 # -------------------------------------
-# 0.5 | -0.08 | (ll,ul), 0
+# 0.4 | 0.0119 |
+# 0.5 | 0.0087 | 
+# 0.6 | 0.00731 |
+# 0.8 | -0.0104 |
+# when the true effect is zero, theta.hat.naive = 0.0186, theta.hat.simex = 0.0087
 
-# TODO: check simulation result when true effect is what theta.hat.naive looks like
+
 # TODO: check sec 6
 
 
+#######################################################################################
+# TODO: check the simulation result - unmeasured confounding
+load(file="../sim.data/sim.1.1.1.1.2500.pa.RData")
+sim.1.1 <- sim.1.1.1.1.2500.pa %>%
+  gather(key='type', value='est', c("naive", "stoEM_reg", "naive.se", "stoEM_reg.se")) %>%
+  filter(type %in% c("naive","stoEM_reg")) %>%
+  mutate(bias=est-(1),
+         setting="Moderate unmeasured confounder")
 
+sim.1.1 %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 1, colour="blue", linetype = "longdash")
+############
 
+# TODO: check simulation result when true effect is zero what theta.hat.naive looks like
+load(file = "../sim.data/sim.2.surv.4.4.1.2500.pa.RData")
+colnames <- colnames(sim.2.surv.4.4.1.2500.pa)
+ret.1.est <- sim.2.surv.4.4.1.2500.pa %>%
+  gather(key='type', value='est', colnames[1:22]) %>%
+  filter(type %in% c("true", "observed","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mcsimex.1", "mcsimex.2", "mcsimex.3", "mcsimex.4")) %>%
+  mutate(bias=est-(0))
 
+ret.1.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+ret.1.est %>%
+  filter(type %in% c("true", "observed","simex.1", "simex.2", "simex.3", "simex.4")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
 
+# when the true effect is not zero
+# naive estimate tend to overestimate
+load(file = "../sim.data/sim.2.surv.4.4.3.2500.pa.RData")
+colnames <- colnames(sim.2.surv.4.4.3.2500.pa)
+ret.3.est <- sim.2.surv.4.4.3.2500.pa %>%
+  gather(key='type', value='est', colnames[1:22]) %>%
+  filter(type %in% c("true", "observed","simex.1", "simex.2", "simex.3", "simex.4",
+                     "mcsimex.1", "mcsimex.2", "mcsimex.3", "mcsimex.4")) %>%
+  mutate(bias=est-(0.5))
 
-
-
-
+ret.3.est %>% group_by(type) %>%
+  summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)))
+ret.3.est %>%
+  filter(type %in% c("true", "observed","simex.1", "simex.2", "simex.3", "simex.4")) %>%
+  ggplot(aes(x=est, colour = type)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash")
 
 
 
