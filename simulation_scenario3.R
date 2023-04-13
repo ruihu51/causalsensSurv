@@ -215,29 +215,98 @@ tm <- system.time(
 )
 sim.3.hybrid(n_range=2500, j_range=1:2, seed.data=sim.3.05.05.1.5.2500.pa,
              alpha=0.1, beta=0.1,
-             theta=1, p_ij=p_ij.5, B=1)
+             theta=0.1, p_ij=p_ij.5, B=20)
 
-ret
+############
+tm <- system.time(
+  sim.3.02.02.1.5.100 <- mclapply(1:100, sim.3.hybrid, n_range=2500,
+                    seed.data=sim.3.05.05.1.5.2500.pa,
+                    alpha=0.2, beta=0.2,
+                    theta=0, p_ij=p_ij.5, B=20,
+                    mc.cores = 4)
+)
+save(sim.3.02.02.1.5.100, file="../sim.data/sim.3.02.02.1.5.100.RData")
+tm
+############
+
+tm <- system.time(
+  ret.2 <- mclapply(1:500, sim.3.hybrid, n_range=2500,
+                  seed.data=sim.3.05.05.1.5.2500.pa,
+                  alpha=0.2, beta=0.2,
+                  theta=1, p_ij=p_ij.5, B=1,
+                  mc.cores = 4)
+)
+save(ret.2, file="../sim.data/ret.2.RData")
+sim.3.hybrid.B(n_range=2500, j_range=1:2, seed.data=sim.3.02.02.4.5.2500.pa,
+               alpha=0.2, beta=0.2,
+               theta=1, p_ij=p_ij.5, B=40)
+tm <- system.time(
+  ret.2.B1 <- mclapply(5:100, sim.3.hybrid.B, n_range=2500,
+                    seed.data=sim.3.02.02.4.5.2500.pa,
+                    alpha=0.2, beta=0.2,
+                    theta=1, p_ij=p_ij.5, B=20,
+                    mc.cores = 4)
+)
+save(ret.2.B1, file="../sim.data/ret.2.B1.RData")
+
+d1 <- do.call(rbind.data.frame, ret.2.B)
+d2 <- do.call(rbind.data.frame, ret.2.B1)
+sim.3.02.02.4.5.2500.pa.B <- bind_rows(d1, d2)
+sim.3.02.02.4.5.2500.pa.B <- join(sim.3.02.02.4.5.2500.pa, sim.3.02.02.4.5.2500.pa.B, by=c("n", "j", "seed"), type="inner")
+
+ret.2.B <- ret.2
+dim(sim.3.02.02.4.5.2500.pa.B)
+
+tm <- system.time(
+  ret.3 <- mclapply(1:500, sim.3.hybrid, n_range=2500,
+                    seed.data=sim.3.05.05.1.5.2500.pa,
+                    alpha=0.1, beta=0.1,
+                    theta=0, p_ij=p_ij.5, B=1,
+                    mc.cores = 4)
+)
+save(ret.3, file="../sim.data/ret.3.RData")
+
 
 # save data format
 # sim.{scenario}.{alpha}.{beta}.{theta}.{mis_prob}.{n}.{project}
-sim.3.05.05.1.5.2500.pa <- ret
-save(sim.3.05.05.1.5.2500.pa, file="../sim.data/sim.3.05.05.1.5.2500.pa.RData")
+sim.3.01.01.4.5.2500.pa <- ret
+save(sim.3.01.01.1.5.2500.pa, file="../sim.data/sim.3.01.01.1.5.2500.pa.RData")
 
 # result
-ret1 <- do.call(rbind.data.frame, ret)
-sim.3.05.05.4.5.2500.pa <- sim.3.05.05.1.5.2500.pa
-head(sim.3.05.05.4.5.2500.pa)
-ret.4.est <- sim.3.05.05.4.5.2500.pa %>%
+sim.3.01.01.1.5.2500.pa <- do.call(rbind.data.frame, ret.3)
+head(sim.3.01.01.1.5.2500.pa)
+data.est <- sim.3.02.02.4.5.2500.pa.B %>%
   gather(key='type', value='est', c("true", "observed", 
-                                    "stoEM_reg", "simex.3", "simex.U.3", "simex.UB.3")) %>%
+                                    "stoEM_reg", "simex.3", "simex.U.3",
+                                    "stoEM_reg.B", "simex.UB.3")) %>%
   filter(type %in% c("true", "observed", 
-                     "stoEM_reg", "simex.3", "simex.U.3", "simex.UB.3")) %>%
+                     "stoEM_reg", "simex.3", "simex.U.3",
+                     "stoEM_reg.B", "simex.UB.3")) %>%
   mutate(bias=est-(1))
 
-ret.4.est %>% group_by(type) %>%
+data.est %>% group_by(type) %>%
   dplyr::summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)))
+
+# how about CI coverage rate?
+data.se <- sim.3.02.02.4.5.2500.pa.B %>%
+  gather(key='type', value='se', c("true.se", "observed.se", 
+                                    "stoEM_reg.se", "simex.se.3", "simex.se.U.3",
+                                   "stoEM_reg.se.B", "simex.se.UB.3")) %>%
+  filter(type %in% c("true.se", "observed.se", 
+                     "stoEM_reg.se", "simex.se.3", "simex.se.U.3",
+                     "stoEM_reg.se.B", "simex.se.UB.3")) 
+data <- cbind(data.est, data.se)[-c(6,7,8)]
+head(cbind(ret.4.est, ret.4.se))
+
+data %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= 1 & 1 <= ul)) %>%
+  group_by(type) %>%
+  dplyr::summarise(est.mean = mean(est),
+            bias.mean = mean(abs(bias)),
+            coverage = mean(coverage))
 
 ret.4.est$type
 library(plyr)
