@@ -1,6 +1,7 @@
 rm(list=ls())
 
 library(survival)
+library(survSens)
 library(simex)
 library(tidyr)
 library(dplyr)
@@ -216,19 +217,129 @@ tm <- system.time(
 sim.3.hybrid(n_range=2500, j_range=1:2, seed.data=sim.3.05.05.1.5.2500.pa,
              alpha=0.1, beta=0.1,
              theta=0.1, p_ij=p_ij.5, B=20)
-
+load("../sim.data/sim.3.05.05.1.5.2500.pa.RData")
 ############
 tm <- system.time(
-  sim.3.02.02.1.5.100 <- mclapply(1:100, sim.3.hybrid, n_range=2500,
+  sim.3.01.01.1.5.200 <- mclapply(1:200, sim.3.hybrid, n_range=2500,
                     seed.data=sim.3.05.05.1.5.2500.pa,
-                    alpha=0.2, beta=0.2,
+                    alpha=0.1, beta=0.1,
                     theta=0, p_ij=p_ij.5, B=20,
                     mc.cores = 4)
 )
-save(sim.3.02.02.1.5.100, file="../sim.data/sim.3.02.02.1.5.100.RData")
+save(sim.3.01.01.1.5.200, file="../sim.data/sim.3.01.01.1.5.200.RData")
 tm
 ############
+# check data
+ret <- do.call(rbind.data.frame, sim.3.02.02.3.0.100)
+theta <- 0.5
+data.est <- ret %>%
+  gather(key='type', value='est', c("true", "observed", 
+                                    "stoEM_reg", "simex.3", 
+                                    "simex.UB.3")) %>%
+  filter(type %in% c("true", "observed", 
+                     "stoEM_reg", "simex.3",
+                     "simex.UB.3")) %>%
+  mutate(bias=est-(theta))
 
+# how about CI coverage rate?
+data.se <- ret %>%
+  gather(key='type', value='se', c("true.se", "observed.se", 
+                                   "stoEM_reg.se", "simex.se.3", 
+                                   "simex.se.UB.3")) %>%
+  filter(type %in% c("true.se", "observed.se", 
+                     "stoEM_reg.se", "simex.se.3", 
+                     "simex.se.UB.3")) 
+data <- cbind(data.est, data.se)[-c(6,7,8)]
+# head(cbind(data.est, data.se))
+
+data %>%
+  mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
+         ul=est+qnorm(1-(1-0.95)/2)*se) %>%
+  mutate(coverage=(ll <= theta & theta <= ul)) %>%
+  group_by(type) %>%
+  dplyr::summarise(est.mean = mean(est),
+                   bias.mean = mean(abs(bias)),
+                   coverage = mean(coverage))
+
+###########
+# figures
+##########
+# 0. integrate data
+load("../sim.data/sim.3.02.02.3.5.100.RData")
+load("../sim.data/sim.3.02.02.3.5.200.RData")
+sim.3.02.02.1.5.100
+d1 <- do.call(rbind.data.frame, sim.3.02.02.3.5.100)
+d2 <- do.call(rbind.data.frame, sim.3.02.02.3.5.200)
+sim.3.02.02.3.5.2500.pa <- bind_rows(d1, d2)
+save(sim.3.02.02.3.5.2500.pa, file="../sim.data/sim.3.02.02.3.5.2500.pa.RData")
+
+# 1.
+for (setting in file_keys[1:3]){
+  index <- as.character(as.integer(file_par_list[[setting]][1]))
+  theta <- file_par_list[[setting]][2]
+  file_name = paste("../sim.data/sim.3.02.02.", index, ".5.2500.pa.RData", sep="")
+  data_name = paste("sim.3.02.02.", index, ".5.2500.pa", sep="")
+  load(file = file_name)
+  ret <- get(data_name)
+  data.est <- ret %>%
+    gather(key='type', value='est', c("true", "observed", 
+                                      "stoEM_reg", "simex.3", 
+                                      "simex.UB.3")) %>%
+    filter(type %in% c("true", "observed", 
+                       "stoEM_reg", "simex.3",
+                       "simex.UB.3")) %>%
+    mutate(bias=est-(theta)) %>%
+    mutate(setting = setting)
+  data.se <- ret %>%
+    gather(key='type', value='se', c("true.se", "observed.se", 
+                                     "stoEM_reg.se", "simex.se.3", 
+                                     "simex.se.UB.3")) %>%
+    filter(type %in% c("true.se", "observed.se", 
+                       "stoEM_reg.se", "simex.se.3", 
+                       "simex.se.UB.3"))
+  ret_name <- paste("ret.", index, sep="")
+  data <- cbind(data.est, data.se)[-c(6,7,8)]
+  assign(ret_name, data)
+}
+summary.data <- bind_rows(
+  ret.1,
+  ret.2,
+  ret.3)
+
+summary.data$setting <- factor(summary.data$setting,
+                               levels = c("No treatment effect",
+                                          "Weak", "Moderate"))
+
+fig.sim.3.bias.2.plot <- summary.data %>%
+  filter(type %in% c("observed", "stoEM_reg", "simex.3", 
+                     "simex.UB.3")) %>%
+  mutate(model=case_when((type == "observed") ~ "observed",
+                         (type == "stoEM_reg") ~ "est_unmeasured", 
+                         (type == "simex.3") ~ "est_residual",
+                         (type == "simex.UB.3") ~ "est_hybrid")) %>%
+  mutate(model=factor(model, levels=c("observed", "est_unmeasured", "est_residual", "est_hybrid"))) %>%
+  ggplot(aes(x=bias, colour = model)) +
+  geom_density() +
+  geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
+  facet_grid(~ setting) +
+  # scale_x_continuous(limits = c(-0.05,0.1)) +
+  labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +  
+  theme(legend.position="bottom")
+
+ggsave(file="../figures/Fig_hybrid_bias_2.eps", width = 290,
+       height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.3.bias.2.plot)
+
+
+
+
+
+
+
+
+
+
+############
 tm <- system.time(
   ret.2 <- mclapply(1:500, sim.3.hybrid, n_range=2500,
                   seed.data=sim.3.05.05.1.5.2500.pa,
