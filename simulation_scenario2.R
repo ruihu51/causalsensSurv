@@ -486,11 +486,17 @@ fig.sim.2.surv.bias.1.plot <- fig.sim.2.surv.bias.1%>%
   geom_vline(xintercept = 0, colour="blue", linetype = "longdash") + 
   facet_grid(~ setting) +
   labs(x="Bias", y = "Bias distribution density") + 
+  theme_bw() +
   theme(legend.position="bottom")
 
 ggsave(file="../figures/Fig_me_surv_bias.eps", width = 290,
        height = 100, units="mm", device=cairo_ps, limitsize = FALSE, fig.sim.2.surv.bias.1.plot) #saves g
-
+##################
+# answer to TODO6: the variance of the naive estimator can be smaller
+fig.sim.2.surv.bias.1 %>%
+  group_by(setting, type) %>%
+  summarise(est.mean = mean(est),
+            est.se = sd(est))
 ##################
 sim.2.surv.1 <- ret.1.est %>%
   filter(type %in% c("observed", "mcsimex.1", "mcsimex.2", "mcsimex.3")) %>%
@@ -621,7 +627,8 @@ ret.3 %>%
   group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
-            coverage = mean(coverage))
+            coverage = mean(coverage),
+            se.mean = mean(se))
 
 ret.1 %>%
   mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
@@ -630,7 +637,8 @@ ret.1 %>%
   group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
-            coverage = mean(coverage))
+            coverage = mean(coverage),
+            se.mean = mean(se))
 
 ret.2 %>%
   mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
@@ -639,7 +647,8 @@ ret.2 %>%
   group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
-            coverage = mean(coverage))
+            coverage = mean(coverage),
+            se.mean = mean(se))
 
 ret.4 %>%
   mutate(ll=est-qnorm(1-(1-0.95)/2)*se,
@@ -648,7 +657,8 @@ ret.4 %>%
   group_by(type) %>%
   summarise(est.mean = mean(est),
             bias.mean = mean(abs(bias)),
-            coverage = mean(coverage))
+            coverage = mean(coverage),
+            se.mean = mean(se))
 
 
 qnorm(1-(1-0.95)/2)
