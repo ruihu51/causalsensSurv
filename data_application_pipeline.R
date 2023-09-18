@@ -80,8 +80,13 @@ trans_pa <- function(x){
   }
 }
 aarp_data$RF_PHYS_MODVIG_CURR1 <- unlist(lapply(aarp_data$RF_PHYS_MODVIG_CURR, trans_pa))
+# binned 0 and 1
+data2$RF_PHYS_MODVIG_CURR2 <- ifelse(data2$RF_PHYS_MODVIG_CURR1<=1,0,1)
+data2$RF_PHYS_MODVIG_CURR3 <- ifelse(data2$RF_PHYS_MODVIG_CURR1<=0,0,1)
+
 # LUNG_MORT
 aarp_data$LUNG_MORT1 <- ifelse(aarp_data$LUNG_MORT<1,0,1)
+
 # all_mort
 code10_all <- paste("0", as.character(seq(19,43,1)), sep="")
 m1 <- ifelse(aarp_data$NDI_ICD9_RECODE_72%in%c("150","160","170","180","190",
@@ -151,7 +156,9 @@ fit.naive.RD.2 <- coxph(Surv(PERSONYRS, respiratory_mort) ~ factor(RF_PHYS_MODVI
 # use fit.naive.RD.2 as a start point
 # define the range of alpha and beta (the key point is how to ??)
 # stochastic EM with regression
-data3 <- data2[data2$RF_PHYS_MODVIG_CURR1%in%c(0,1),]
+data3 <- data2[data2$RF_PHYS_MODVIG_CURR1%in%c(0,1),] # data1 have already removed category 9
+
+
 X <- cbind(factor(data3$ENTRY_AGE1), factor(data3$SEX), factor(data3$RACEI), factor(data3$EDUCM), factor(data3$HEALTH),
            factor(data3$BMI_CUR1), factor(data3$HEI2015_TOTAL_SCORE1), factor(data3$MPED_A_BEV_NOFOOD1),
            factor(data3$FUQ_SMOKE_STOP), factor(data3$SMOKE_DOSE))
@@ -164,9 +171,27 @@ fit.naive.RD.3 <- coxph(Surv(PERSONYRS, respiratory_mort) ~ factor(RF_PHYS_MODVI
 fit.stoEM_reg <- survSensitivity(data3$PERSONYRS, data3$respiratory_mort, 
                                  data3$RF_PHYS_MODVIG_CURR1, X, "stoEM_reg",
                                  zetaT = beta, zetaZ = alpha,
-                                 B = 20)
+                                 B = 5)
 theta.hat.stoEM_reg <- fit.stoEM_reg$tau1
 theta.hat.stoEM_reg.se <- fit.stoEM_reg$tau1.se
+
+#################
+## the proper range of alpha and beta
+# outcome ~ observed confounder
+fit.naive.RD.3 <- coxph(Surv(PERSONYRS, respiratory_mort) ~ factor(RF_PHYS_MODVIG_CURR1) 
+                        + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
+                        + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
+                        + factor(FUQ_SMOKE_STOP) + factor(SMOKE_DOSE), data=data3)
+fit.AW <- glm(factor(RF_PHYS_MODVIG_CURR1) ~ factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
+    + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
+    + factor(FUQ_SMOKE_STOP) + factor(SMOKE_DOSE), data=data3, family = "binomial")
+
+# zetaT - outcome
+fit.stoEM_reg.1 <- survSensitivity(data3$PERSONYRS, data3$respiratory_mort, 
+                                 as.numeric(data3$RF_PHYS_MODVIG_CURR1)-1, X, "stoEM_reg",
+                                 zetaT = -2.5, zetaZ = -1.5,
+                                 B = 5)
+ ###############
 
 ######################################################
 ## STEP 2: Suppose that there is misclassification error in SMOKE_DOSE
@@ -197,6 +222,81 @@ fit.mcsimex.1 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij),
                          SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
 theta.hat.mcsimex.1 <- fit.mcsimex.1$coefficients[1]
 theta.hat.mcsimex.se.1 <- sqrt(fit.mcsimex.1$variance.jackknife[1,1])
+
+########################
+# possible matrix value
+########################
+# sym 1 mild
+true_prob <- 0.9
+false_prob <- 1 - true_prob
+p_ij.1.1 <- matrix(c(true_prob, false_prob/2, 0, 0, 0, 0,
+                     false_prob, true_prob, false_prob/2, 0, 0, 0,
+                 0, false_prob/2, true_prob, false_prob/2, 0, 0,
+                 0, 0, false_prob/2, true_prob, false_prob/2, 0,
+                 0, 0, 0, false_prob/2, true_prob, false_prob,
+                 0, 0, 0, 0, false_prob/2, true_prob), nrow = 6, byrow = TRUE)
+dimnames(p_ij.1.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+p_ij.1.1 <- build.mc.matrix(p_ij.1.1, method = "jlt") # random
+check.mc.matrix(list(p_ij.1.1))
+fit.mcsimex.1.1 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij.1.1), 
+                         SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
+
+# moderate
+true_prob <- 0.7
+false_prob <- 1 - true_prob
+p_ij.1.2 <- matrix(c(true_prob, false_prob/2, 0, 0, 0, 0,
+                     false_prob, true_prob, false_prob/2, 0, 0, 0,
+                     0, false_prob/2, true_prob, false_prob/2, 0, 0,
+                     0, 0, false_prob/2, true_prob, false_prob/2, 0,
+                     0, 0, 0, false_prob/2, true_prob, false_prob,
+                     0, 0, 0, 0, false_prob/2, true_prob), nrow = 6, byrow = TRUE)
+dimnames(p_ij.1.2) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+p_ij.1.2 <- build.mc.matrix(p_ij.1.2, method = "jlt") # not random did twice
+check.mc.matrix(list(p_ij.1.2))
+fit.mcsimex.1.2 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij.1.2), 
+                           SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
+
+# extreme
+true_prob <- 0.5
+false_prob <- 1 - true_prob
+p_ij.1.3 <- matrix(c(true_prob, false_prob/2, 0, 0, 0, 0,
+                     false_prob, true_prob, false_prob/2, 0, 0, 0,
+                     0, false_prob/2, true_prob, false_prob/2, 0, 0,
+                     0, 0, false_prob/2, true_prob, false_prob/2, 0,
+                     0, 0, 0, false_prob/2, true_prob, false_prob,
+                     0, 0, 0, 0, false_prob/2, true_prob), nrow = 6, byrow = TRUE)
+dimnames(p_ij.1.3) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+p_ij.1.3 <- build.mc.matrix(p_ij.1.3, method = "jlt") # not random did twice
+check.mc.matrix(list(p_ij.1.3))
+fit.mcsimex.1.3 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij.1.3), 
+                           SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
+
+true_prob <- 0.9
+false_prob <- 1 - true_prob
+prop <- 1 + 1/2 + 1/4 + 1/8 + 1/16
+# p_ij.3.1 <- matrix(c(1-0.0001*5, false_prob-0.0001*4, false_prob*(1/(2*prop.3))-0.0001*3, false_prob*(1/(4*prop.2))-0.0001*2, false_prob*(1/(8*prop.1))-0.0001*1, false_prob*(1/(16*prop)),
+#                      0.0001, true_prob, false_prob*(1/prop.3), false_prob*(1/(2*prop.2)), false_prob*(1/(4*prop.1)), false_prob*(1/(8*prop)),
+#                      0.0001, 0.0001, true_prob, false_prob*(1/prop.2), false_prob*(1/(2*prop.1)), false_prob*(1/(4*prop)),
+#                      0.0001, 0.0001, 0.0001, true_prob, false_prob*(1/prop.1), false_prob*(1/(2*prop)),
+#                      0.0001, 0.0001, 0.0001, 0.0001, true_prob, false_prob*(1/prop),
+#                      0.0001, 0.0001, 0.0001, 0.0001, 0.0001, true_prob), nrow = 6, byrow = TRUE)
+dimnames(p_ij.3.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+check.mc.matrix(list(p_ij.3.1))
+p_ij.3.1 <- build.mc.matrix(p_ij.3.1, method = "jlt")
+
+row <- c(true_prob, false_prob*(1/prop), false_prob*(1/(2*prop)),
+  false_prob*(1/(4*prop)), false_prob*(1/(8*prop)), false_prob*(1/(16*prop)))
+
+p_ij.3.1 <- matrix(c(row[1],row[2:6],
+  row[2:1],row[3:6],
+  row[3:1],row[4:6],
+  row[4:1],row[5:6],
+  row[5:1],row[6],
+  row[6:1]), nrow = 6, byrow = FALSE)
+check.mc.matrix(list(p_ij.3.1))
+fit.mcsimex.3.1 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij.3.1), 
+                           SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
+
 
 ###########################################
 # the above two steps can be done separated
