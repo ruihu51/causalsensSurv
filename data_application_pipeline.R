@@ -5,6 +5,12 @@ library(survival)
 library(survSens)
 library(simex)
 
+###################
+# data exclusion
+##################
+summary(aarp_data$FL_PROXY) # all 0 no 1 but 18854 NA
+# TODO1: need to use fl_rf_proxy to remove RF proxies
+
 ######################
 # data pre processing
 #####################
@@ -23,6 +29,39 @@ trans_age <- function(x){
   }
 }
 aarp_data$ENTRY_AGE1 <- unlist(lapply(aarp_data$ENTRY_AGE, trans_age))
+
+# smoking behavior
+# SMOKE_DOSE
+summary(aarp_data$SMOKE_DOSE) # no NA
+table(aarp_data$SMOKE_DOSE)
+# 1     2     3     4     5     6 
+# 41528 50449 32024 21478 14204  4098
+sum(table(aarp_data$SMOKE_DOSE))
+
+# SMOKE_QUIT
+# transfer smoke_quit_detailed to smoke_quit
+summary(aarp_data$SMOKE_QUIT_DETAILED) # no NA
+table(aarp_data$SMOKE_QUIT_DETAILED)
+trans_smokequit <- function(x){
+  if (x == 0) { 
+    return(0)
+  } else if (x>=1 & x<=6) {
+    return(1)
+  } else if (x>=7 & x<=12) {
+    return(2)
+  } else if (x>=13 & x<=18) {
+    return(3)
+  } else if (x>=19 & x<=24) {
+    return(4)
+  } else if (x>=25 & x<=30) {
+    return(5)
+  } else {
+    return(9)
+  }
+}
+aarp_data$SMOKE_QUIT1 <- unlist(lapply(aarp_data$SMOKE_QUIT_DETAILED, trans_smokequit))
+sum(table(aarp_data$SMOKE_QUIT1))
+
 # BMI_CUR
 trans_bmi <- function(x){
   if (is.na(x)) { 
@@ -81,8 +120,8 @@ trans_pa <- function(x){
 }
 aarp_data$RF_PHYS_MODVIG_CURR1 <- unlist(lapply(aarp_data$RF_PHYS_MODVIG_CURR, trans_pa))
 # binned 0 and 1
-data2$RF_PHYS_MODVIG_CURR2 <- ifelse(data2$RF_PHYS_MODVIG_CURR1<=1,0,1)
-data2$RF_PHYS_MODVIG_CURR3 <- ifelse(data2$RF_PHYS_MODVIG_CURR1<=0,0,1)
+aarp_data$RF_PHYS_MODVIG_CURR2 <- ifelse(aarp_data$RF_PHYS_MODVIG_CURR1<=1,0,1)
+aarp_data$RF_PHYS_MODVIG_CURR3 <- ifelse(aarp_data$RF_PHYS_MODVIG_CURR1<=0,0,1)
 
 # LUNG_MORT
 aarp_data$LUNG_MORT1 <- ifelse(aarp_data$LUNG_MORT<1,0,1)
@@ -104,13 +143,14 @@ aarp_data$respiratory_mort <- ifelse(m1+m2>=1,1,0)
 ######################################################
 ## STEP 0: Obtain the naive estimate in the Cox model
 #####################################################
-table(aarp_data$RF_PHYS_MODVIG_CURR1)
+table(aarp_data$RF_PHYS_MODVIG_CURR1) # no NA
 # 0     1     2     9 
 # 39524 40481 81522  2254 
 
 # naive model - lung_mort
 data1 <- aarp_data[aarp_data$RF_PHYS_MODVIG_CURR1!=9,]
-data2 <- data1[!is.na(data1$FUQ_SMOKE_STOP),]
+# data2 <- data1[!is.na(data1$FUQ_SMOKE_STOP),]
+data2 <- data1
 
 fit.naive.lungcancer.1 <- coxph(Surv(PERSONYRS, LUNG_MORT1) ~ factor(RF_PHYS_MODVIG_CURR1) 
                    + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
@@ -120,7 +160,7 @@ fit.naive.lungcancer.1 <- coxph(Surv(PERSONYRS, LUNG_MORT1) ~ factor(RF_PHYS_MOD
 fit.naive.lungcancer.2 <- coxph(Surv(PERSONYRS, LUNG_MORT1) ~ factor(RF_PHYS_MODVIG_CURR1) 
                     + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
                     + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
-                    + factor(FUQ_SMOKE_STOP) + factor(SMOKE_DOSE), data=data2)
+                    + factor(SMOKE_QUIT1) + factor(SMOKE_DOSE), data=data2)
 
 # naive model - all_mort
 3657 + 8807 + 12403
@@ -133,7 +173,7 @@ fit.naive.allcancer.1 <- coxph(Surv(PERSONYRS, all_mort) ~ factor(RF_PHYS_MODVIG
 fit.naive.allcancer.2 <- coxph(Surv(PERSONYRS, all_mort) ~ factor(RF_PHYS_MODVIG_CURR1) 
                                 + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
                                 + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
-                                + factor(FUQ_SMOKE_STOP) + factor(SMOKE_DOSE), data=data2)
+                                + factor(SMOKE_QUIT1) + factor(SMOKE_DOSE), data=data2)
 
 # naive model - respiratory_mort
 1465 + 2634 + 2972
@@ -146,7 +186,7 @@ fit.naive.RD.1 <- coxph(Surv(PERSONYRS, respiratory_mort) ~ factor(RF_PHYS_MODVI
 fit.naive.RD.2 <- coxph(Surv(PERSONYRS, respiratory_mort) ~ factor(RF_PHYS_MODVIG_CURR1) 
                     + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH)
                     + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
-                    + factor(FUQ_SMOKE_STOP) + factor(SMOKE_DOSE), data=data2)
+                    + factor(SMOKE_QUIT1) + factor(SMOKE_DOSE), data=data2)
 
 
 ######################################################
