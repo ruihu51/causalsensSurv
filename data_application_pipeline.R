@@ -29,6 +29,33 @@ trans_age <- function(x){
   }
 }
 aarp_data$ENTRY_AGE1 <- unlist(lapply(aarp_data$ENTRY_AGE, trans_age))
+
+# RACEI
+trans_race <- function(x){
+  if (x%in%c(4,5,6)) { 
+    return(4)
+  } else {
+    return(x)
+  }
+}
+aarp_data$RACEI1 <- unlist(lapply(aarp_data$RACEI, trans_race))
+
+# EDUCM
+trans_educ <- function(x){
+  if (x<=2) { 
+    return(1)
+  } else if (x==3) {
+    return(2)
+  } else if  (x==4) {
+    return(3)
+  } else if  (x==5) {
+    return(4)
+  } else {
+    return(x)
+  }
+}
+aarp_data$EDUCM1 <- unlist(lapply(aarp_data$EDUCM, trans_educ))
+
 # HEALTH
 trans_health <- function(x){
   if (x<=2) { 
@@ -327,19 +354,26 @@ check.mc.matrix(list(p_ij.1.3))
 system.time(fit.mcsimex.1.3 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.1.3), 
                            SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
 
+# slower speed
+# sym 1 mild
+true_prob <- 0.9
+false_prob <- 1 - true_prob
+r1 <- 2.1/6
+r2 <- 1.8/6
+r3 <- 0.9/6
+p_ij.2.1 <- matrix(c(true_prob, false_prob*r1, false_prob*r3, 0, 0, 0,
+                     false_prob, true_prob, false_prob*r1, 0, 0, 0,
+                     0, false_prob*r1, true_prob, false_prob*r1, false_prob*r2, 0,
+                     0, false_prob*r2, false_prob*r1, true_prob, false_prob*r1, 0,
+                     0, 0, false_prob*r3, false_prob*r1, true_prob, false_prob,
+                     0, 0, 0, 0, false_prob*r1, true_prob), nrow = 6, byrow = TRUE)
+dimnames(p_ij.2.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+p_ij.2.1 <- build.mc.matrix(p_ij.2.1, method = "jlt") # random
+
+# asym 1 mild
 true_prob <- 0.9
 false_prob <- 1 - true_prob
 prop <- 1 + 1/2 + 1/4 + 1/8 + 1/16
-# p_ij.3.1 <- matrix(c(1-0.0001*5, false_prob-0.0001*4, false_prob*(1/(2*prop.3))-0.0001*3, false_prob*(1/(4*prop.2))-0.0001*2, false_prob*(1/(8*prop.1))-0.0001*1, false_prob*(1/(16*prop)),
-#                      0.0001, true_prob, false_prob*(1/prop.3), false_prob*(1/(2*prop.2)), false_prob*(1/(4*prop.1)), false_prob*(1/(8*prop)),
-#                      0.0001, 0.0001, true_prob, false_prob*(1/prop.2), false_prob*(1/(2*prop.1)), false_prob*(1/(4*prop)),
-#                      0.0001, 0.0001, 0.0001, true_prob, false_prob*(1/prop.1), false_prob*(1/(2*prop)),
-#                      0.0001, 0.0001, 0.0001, 0.0001, true_prob, false_prob*(1/prop),
-#                      0.0001, 0.0001, 0.0001, 0.0001, 0.0001, true_prob), nrow = 6, byrow = TRUE)
-dimnames(p_ij.3.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
-check.mc.matrix(list(p_ij.3.1))
-p_ij.3.1 <- build.mc.matrix(p_ij.3.1, method = "jlt")
-
 row <- c(true_prob, false_prob*(1/prop), false_prob*(1/(2*prop)),
   false_prob*(1/(4*prop)), false_prob*(1/(8*prop)), false_prob*(1/(16*prop)))
 
@@ -350,12 +384,15 @@ p_ij.3.1 <- matrix(c(row[1],row[2:6],
   row[5:1],row[6],
   row[6:1]), nrow = 6, byrow = FALSE)
 check.mc.matrix(list(p_ij.3.1))
+dimnames(p_ij.3.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
 fit.mcsimex.3.1 <- mcsimex(fit.naive.RD.3.t, mc.matrix = list(SMOKE_DOSE=p_ij.3.1), 
                            SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE)
 
-# moderate
+# asym 1 moderate
 true_prob <- 0.7
 false_prob <- 1 - true_prob
+row <- c(true_prob, false_prob*(1/prop), false_prob*(1/(2*prop)),
+         false_prob*(1/(4*prop)), false_prob*(1/(8*prop)), false_prob*(1/(16*prop)))
 p_ij.3.2 <- matrix(c(row[1],row[2:6],
                      row[2:1],row[3:6],
                      row[3:1],row[4:6],
@@ -367,7 +404,77 @@ check.mc.matrix(list(p_ij.3.2))
 dimnames(p_ij.3.2) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
 system.time(fit.mcsimex.3.2 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.3.2), 
                                        SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
-eigen(p_ij.1.1)
+
+# asym 1 extreme
+true_prob <- 0.5
+false_prob <- 1 - true_prob
+row <- c(true_prob, false_prob*(1/prop), false_prob*(1/(2*prop)),
+         false_prob*(1/(4*prop)), false_prob*(1/(8*prop)), false_prob*(1/(16*prop)))
+p_ij.3.3 <- matrix(c(row[1],row[2:6],
+                     row[2:1],row[3:6],
+                     row[3:1],row[4:6],
+                     row[4:1],row[5:6],
+                     row[5:1],row[6],
+                     row[6:1]), nrow = 6, byrow = FALSE)
+p_ij.3.3 <- build.mc.matrix(p_ij.3.3, method = "jlt")
+check.mc.matrix(list(p_ij.3.3))
+dimnames(p_ij.3.3) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+system.time(fit.mcsimex.3.3 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.3.3), 
+                                       SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
+
+# asym 2 mild
+true_prob <- 0.9
+false_prob <- 1 - true_prob
+prop <- 1 + 0.75 + (0.75)^2 + (0.75)^3 + (0.75)^4
+row <- c(true_prob, false_prob*(1/prop), false_prob*(0.75/prop),
+         false_prob*(0.75^2/prop), false_prob*(0.75^3/prop), false_prob*(0.75^4/prop))
+p_ij.4.1 <- matrix(c(row[1],row[2:6],
+                     row[2:1],row[3:6],
+                     row[3:1],row[4:6],
+                     row[4:1],row[5:6],
+                     row[5:1],row[6],
+                     row[6:1]), nrow = 6, byrow = FALSE)
+p_ij.4.1 <- build.mc.matrix(p_ij.4.1, method = "jlt")
+check.mc.matrix(list(p_ij.4.1))
+dimnames(p_ij.4.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+system.time(fit.mcsimex.4.1 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.4.1), 
+                                       SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
+
+# asym 2 moderate
+true_prob <- 0.7
+false_prob <- 1 - true_prob
+row <- c(true_prob, false_prob*(1/prop), false_prob*(0.75/prop),
+         false_prob*(0.75^2/prop), false_prob*(0.75^3/prop), false_prob*(0.75^4/prop))
+p_ij.4.2 <- matrix(c(row[1],row[2:6],
+                     row[2:1],row[3:6],
+                     row[3:1],row[4:6],
+                     row[4:1],row[5:6],
+                     row[5:1],row[6],
+                     row[6:1]), nrow = 6, byrow = FALSE)
+p_ij.4.2 <- build.mc.matrix(p_ij.4.2, method = "jlt")
+check.mc.matrix(list(p_ij.4.2))
+dimnames(p_ij.4.2) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+system.time(fit.mcsimex.4.2 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.4.2), 
+                                       SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
+
+# asym 2 extreme
+true_prob <- 0.5
+false_prob <- 1 - true_prob
+row <- c(true_prob, false_prob*(1/prop), false_prob*(0.75/prop),
+         false_prob*(0.75^2/prop), false_prob*(0.75^3/prop), false_prob*(0.75^4/prop))
+p_ij.4.3 <- matrix(c(row[1],row[2:6],
+                     row[2:1],row[3:6],
+                     row[3:1],row[4:6],
+                     row[4:1],row[5:6],
+                     row[5:1],row[6],
+                     row[6:1]), nrow = 6, byrow = FALSE)
+p_ij.4.3 <- build.mc.matrix(p_ij.4.3, method = "jlt")
+check.mc.matrix(list(p_ij.4.3))
+dimnames(p_ij.4.3) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+system.time(fit.mcsimex.4.3 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.4.3), 
+                                       SIMEXvariable = c("SMOKE_DOSE"), asymptotic = FALSE))
+
+# matrix that fulfill the requirement
 p_ij.1.1^-0.5
 p_ij.1.1^-1
 p_ij.3.2^-0.5
