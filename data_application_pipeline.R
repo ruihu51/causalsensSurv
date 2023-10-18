@@ -121,12 +121,17 @@ aarp_data$BMI_CUR1 <- unlist(lapply(aarp_data$BMI_CUR, trans_bmi))
 q25 <- quantile(aarp_data$HEI2015_TOTAL_SCORE)[2]
 q50 <- quantile(aarp_data$HEI2015_TOTAL_SCORE)[3]
 q75 <- quantile(aarp_data$HEI2015_TOTAL_SCORE)[4]
+q25 <- 62.5
+q50 <- 69.3
+q75 <- 75.2
+  
+
 trans_hei <- function(x){
-  if (x<q25) { 
+  if (x<=q25) { 
     return(0)
-  } else if (x<q50) {
+  } else if (x<=q50) {
     return(1)
-  } else if (x<q75) {
+  } else if (x<=q75) {
     return(2)
   } else {
     return(3)
@@ -148,7 +153,7 @@ trans_alcohol <- function(x,y){
 aarp_data$MPED_A_BEV_NOFOOD1 <- mapply(trans_alcohol, aarp_data$SEX, aarp_data$MPED_A_BEV_NOFOOD)
 # RF_PHYS_MODVIG_CURR
 trans_pa <- function(x){
-  if (x<=2) { 
+  if (x<2) { 
     return(0)
   } else if (x<=3) {
     return(1)
