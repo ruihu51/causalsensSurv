@@ -4,6 +4,7 @@ rm(list=ls())
 library(survival)
 library(survSens)
 library(simex)
+library(ggplot2)
 
 ###################
 # data exclusion
@@ -189,14 +190,29 @@ aarp_data$respiratory_mort <- ifelse(m1+m2>=1,1,0)
 ## STEP 0: Obtain the naive estimate in the Cox model
 #####################################################
 table(aarp_data$RF_PHYS_MODVIG_CURR1) # no NA
-# 0     1     2     9 
-# 39524 40481 81522  2254 
 
-# naive model - lung_mort
-data1 <- aarp_data[aarp_data$RF_PHYS_MODVIG_CURR1!=9,]
-# data2 <- data1[!is.na(data1$FUQ_SMOKE_STOP),]
-data2 <- data1[!is.na(data1$FL_PROXY),]
+table(aarp_data$RF_PHYS_MODVIG_CURR2)
+# 0     1 
+# 79139 80825
 
+table(aarp_data$RF_PHYS_MODVIG_CURR3)
+# 0      1 
+# 22526 137438 
+
+table(aarp_data$RF_PHYS_MODVIG_CURR2, aarp_data$LUNG_MORT1)
+table(aarp_data$RF_PHYS_MODVIG_CURR2, aarp_data$all_mort)
+table(aarp_data$RF_PHYS_MODVIG_CURR2, aarp_data$respiratory_mort)
+
+table(aarp_data$RF_PHYS_MODVIG_CURR3, aarp_data$LUNG_MORT1)
+table(aarp_data$RF_PHYS_MODVIG_CURR3, aarp_data$all_mort)
+table(aarp_data$RF_PHYS_MODVIG_CURR3, aarp_data$respiratory_mort)
+
+table(aarp_data$LUNG_MORT1)
+table(aarp_data$all_mort)
+table(aarp_data$respiratory_mort)
+
+1465 + 2634 + 2972
+table(aarp_data$LUNG_MORT1)
 fit.naive.lungcancer.1 <- coxph(Surv(PERSONYRS, LUNG_MORT1) ~ factor(RF_PHYS_MODVIG_CURR1) 
                    + factor(ENTRY_AGE1) + factor(SEX) + factor(RACEI) + factor(EDUCM) + factor(HEALTH1)
                    + factor(BMI_CUR1) + factor(HEI2015_TOTAL_SCORE1) + factor(MPED_A_BEV_NOFOOD1)
@@ -323,7 +339,7 @@ p_ij.1.1 <- matrix(c(true_prob, false_prob/2, 0, 0, 0, 0,
                  0, 0, false_prob/2, true_prob, false_prob/2, 0,
                  0, 0, 0, false_prob/2, true_prob, false_prob,
                  0, 0, 0, 0, false_prob/2, true_prob), nrow = 6, byrow = TRUE)
-dimnames(p_ij.1.1) <- list(levels(data3$SMOKE_DOSE), levels(data3$SMOKE_DOSE))
+dimnames(p_ij.1.1) <- list(levels(aarp_data$SMOKE_DOSE), levels(aarp_data$SMOKE_DOSE))
 p_ij.1.1 <- build.mc.matrix(p_ij.1.1, method = "jlt") # random
 check.mc.matrix(list(p_ij.1.1))
 fit.mcsimex.1.1 <- mcsimex(fit.naive.RD.2.2.t, mc.matrix = list(SMOKE_DOSE=p_ij.1.1), 
